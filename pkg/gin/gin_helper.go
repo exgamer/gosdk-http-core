@@ -10,7 +10,6 @@ import (
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	"github.com/exgamer/gosdk-http-core/pkg/gin/validation"
 	"github.com/exgamer/gosdk-http-core/pkg/helpers"
-	"github.com/exgamer/gosdk-http-core/pkg/middleware"
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
@@ -52,7 +51,6 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 	router.HandleMethodNotAllowed = true
 	p := ginprometheus.NewPrometheus("ginHelpers")
 	p.Use(router)
-	router.Use(middleware.RequestInfoMiddleware(baseConfig))
 	router.Use(sentrygin.New(sentrygin.Options{}))
 	//router.Use(gin.Logger())
 	if httpConfig.HandlerTimeout > 0 {
