@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/exgamer/gosdk-http-core/pkg/http/helpers"
+	"github.com/exgamer/gosdk-http-core/pkg/helpers"
 	"github.com/gin-gonic/gin"
 )
 

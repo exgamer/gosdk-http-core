@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/exgamer/gosdk-http-core/pkg/config"
-	"github.com/exgamer/gosdk-http-core/pkg/debug"
+	config2 "github.com/exgamer/gosdk-core/pkg/config"
+	"github.com/exgamer/gosdk-core/pkg/constants"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
@@ -20,7 +20,7 @@ func FormattedTextErrorResponse(c *gin.Context, statusCode int, message string, 
 }
 
 func TextErrorResponse(c *gin.Context, statusCode int, message string, context map[string]any) {
-	AppExceptionResponse(c, exception.NewAppException(statusCode, errors.New(message), context))
+	AppExceptionResponse(c, exception.NewHttpException(statusCode, errors.New(message), context))
 }
 
 func FormattedErrorResponse(c *gin.Context, statusCode int, err error, context map[string]any) {
@@ -29,19 +29,19 @@ func FormattedErrorResponse(c *gin.Context, statusCode int, err error, context m
 }
 
 func ErrorResponse(c *gin.Context, statusCode int, err error, context map[string]any) {
-	AppExceptionResponse(c, exception.NewAppException(statusCode, err, context))
+	AppExceptionResponse(c, exception.NewHttpException(statusCode, err, context))
 }
 
 func ErrorResponseUntrackableSentry(c *gin.Context, statusCode int, err error, context map[string]any) {
 	AppExceptionResponse(c, exception.NewUntrackableAppException(statusCode, err, context))
 }
 
-func FormattedAppExceptionResponse(c *gin.Context, exception *exception.AppException) {
+func FormattedAppExceptionResponse(c *gin.Context, exception *exception.HttpException) {
 	AppExceptionResponse(c, exception)
 	FormattedResponse(c)
 }
 
-func AppExceptionResponse(c *gin.Context, exception *exception.AppException) {
+func AppExceptionResponse(c *gin.Context, exception *exception.HttpException) {
 	c.Set("exception", exception)
 	c.Status(exception.Code)
 }
@@ -76,26 +76,26 @@ func FormattedResponse(c *gin.Context) {
 		data, _ := c.Get("data")
 		var response interface{}
 
-		if dbg := debug.GetDebugCollectorFromGinContext(c); dbg != nil {
-			dbg.CalculateTotalTime()
-			response = struct {
-				Success bool        `json:"success"`
-				Data    interface{} `json:"data"`
-				Debug   interface{} `json:"debug"`
-			}{
-				true,
-				data,
-				dbg,
-			}
-		} else {
-			response = struct {
-				Success bool        `json:"success"`
-				Data    interface{} `json:"data"`
-			}{
-				true,
-				data,
-			}
+		//if dbg := debug.GetDebugCollectorFromGinContext(c); dbg != nil {
+		//	dbg.CalculateTotalTime()
+		//	response = struct {
+		//		Success bool        `json:"success"`
+		//		Data    interface{} `json:"data"`
+		//		Debug   interface{} `json:"debug"`
+		//	}{
+		//		true,
+		//		data,
+		//		dbg,
+		//	}
+		//} else {
+		response = struct {
+			Success bool        `json:"success"`
+			Data    interface{} `json:"data"`
+		}{
+			true,
+			data,
 		}
+		//}
 
 		jsonBytes, err := json.Marshal(response)
 
@@ -117,51 +117,49 @@ func FormattedResponse(c *gin.Context) {
 		return
 	}
 
-	appException := exception.AppException{}
+	appException := exception.HttpException{}
 	mapstructure.Decode(appExceptionObject, &appException)
 	fmt.Printf("%+v\n", appException)
 	serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
 	requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
-	value, exists := c.Get("app_info")
+	value, exists := c.Get(constants.AppInfoKey)
 
 	if exists {
-		appInfo := value.(*config.AppInfo)
+		appInfo := value.(*config2.AppInfo)
 		serviceName = appInfo.ServiceName
-		requestId = appInfo.RequestId
 	}
 
 	responseData := gin.H{
-		"status":       appException.Code,
-		"error":        appException.GetErrorType(),
-		"message":      appException.Error.Error(),
-		"request_id":   requestId,
-		"hostname":     serviceName,
-		"service_code": appException.ServiceCode,
-		"details":      appException.Context,
+		"status":     appException.Code,
+		"error":      appException.GetErrorType(),
+		"message":    appException.Error.Error(),
+		"request_id": requestId,
+		"hostname":   serviceName,
+		"details":    appException.Context,
 	}
 
 	var response interface{}
 
-	if dbg := debug.GetDebugCollectorFromGinContext(c); dbg != nil {
-		dbg.CalculateTotalTime()
-		response = struct {
-			Success bool        `json:"success"`
-			Data    interface{} `json:"data"`
-			Debug   interface{} `json:"debug"`
-		}{
-			false,
-			responseData,
-			dbg,
-		}
-	} else {
-		response = struct {
-			Success bool        `json:"success"`
-			Data    interface{} `json:"data"`
-		}{
-			false,
-			responseData,
-		}
-	}
+	//if dbg := debug.GetDebugCollectorFromGinContext(c); dbg != nil {
+	//	dbg.CalculateTotalTime()
+	//	response = struct {
+	//		Success bool        `json:"success"`
+	//		Data    interface{} `json:"data"`
+	//		Debug   interface{} `json:"debug"`
+	//	}{
+	//		false,
+	//		responseData,
+	//		dbg,
+	//	}
+	//} else {
+	//	response = struct {
+	//		Success bool        `json:"success"`
+	//		Data    interface{} `json:"data"`
+	//	}{
+	//		false,
+	//		responseData,
+	//	}
+	//}
 
 	jsonBytes, err := json.Marshal(response)
 

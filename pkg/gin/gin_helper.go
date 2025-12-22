@@ -1,15 +1,16 @@
 package gin
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
+	constants2 "github.com/exgamer/gosdk-core/pkg/constants"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
-	"github.com/exgamer/gosdk-http-core/pkg/debug"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	"github.com/exgamer/gosdk-http-core/pkg/gin/validation"
-	"github.com/exgamer/gosdk-http-core/pkg/http/helpers"
+	"github.com/exgamer/gosdk-http-core/pkg/helpers"
+	"github.com/exgamer/gosdk-http-core/pkg/middleware"
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
@@ -23,19 +24,18 @@ import (
 	ginprometheus "github.com/zsais/go-gin-prometheus"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
 // InitRouter Базовая инициализация gin
-func InitRouter(baseConfig *config.BaseConfig) *gin.Engine {
+func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig) *gin.Engine {
 	if baseConfig.AppEnv == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	// Options
 	router := gin.New()
-	prefix := baseConfig.SwaggerPrefix
+	prefix := httpConfig.SwaggerPrefix
 
 	if prefix == "" {
 		prefix = baseConfig.Name
@@ -52,10 +52,11 @@ func InitRouter(baseConfig *config.BaseConfig) *gin.Engine {
 	router.HandleMethodNotAllowed = true
 	p := ginprometheus.NewPrometheus("ginHelpers")
 	p.Use(router)
+	router.Use(middleware.RequestInfoMiddleware(baseConfig))
 	router.Use(sentrygin.New(sentrygin.Options{}))
 	//router.Use(gin.Logger())
-	if baseConfig.HandlerTimeout > 0 {
-		router.Use(timeout.Timeout(timeout.WithTimeout(time.Duration(baseConfig.HandlerTimeout) * time.Second)))
+	if httpConfig.HandlerTimeout > 0 {
+		router.Use(timeout.Timeout(timeout.WithTimeout(time.Duration(httpConfig.HandlerTimeout) * time.Second)))
 	}
 
 	router.Use(gin.CustomRecovery(ErrorHandler))
@@ -76,7 +77,7 @@ func ErrorHandler(c *gin.Context, err any) {
 	c.JSON(http.StatusInternalServerError, gin.H{"message": goErr.Error(), "details": details, "success": false, "service_code": 0})
 }
 
-func Error(c *gin.Context, exception *exception.AppException) {
+func Error(c *gin.Context, exception *exception.HttpException) {
 	c.Set("exception", exception)
 	c.Status(exception.Code)
 }
@@ -85,104 +86,93 @@ func Success(c *gin.Context, data any) {
 	c.Set("data", data)
 }
 
-func SetAppInfo(c *gin.Context, baseConfig *config.BaseConfig) {
-	c.Set("app_info", getInstanceAppInfo(c, baseConfig))
+func SetAppInfo(c *gin.Context, baseConfig *baseConfig.BaseConfig) {
+	c.Set(constants2.AppInfoKey, getInstanceAppInfo(baseConfig))
 }
 
-func getInstanceAppInfo(c *gin.Context, baseConfig *config.BaseConfig) *config.AppInfo {
-	appInfo := &config.AppInfo{}
-	setBaseDataToAppInfo(c, appInfo)
+func SetHttpInfo(c *gin.Context) {
+	c.Set(constants.HttpInfoKey, getInstanceHttpInfo(c))
+}
+
+func getInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
+	appInfo := &baseConfig.AppInfo{}
 	appInfo.AppEnv = "UNKNOWN (maybe you not used RequestMiddleware)"
 	appInfo.ServiceName = "UNKNOWN (maybe you not used RequestMiddleware)"
 
-	if baseConfig != nil {
-		appInfo.AppEnv = baseConfig.AppEnv
-		appInfo.ServiceName = baseConfig.Name
+	if appConfig != nil {
+		appInfo.AppEnv = appConfig.AppEnv
+		appInfo.ServiceName = appConfig.Name
 	}
 
 	return appInfo
 }
 
-func setBaseDataToAppInfo(c *gin.Context, appInfo *config.AppInfo) {
-	var err error
-	appInfo.RequestId = c.GetHeader(constants.RequestIdHeaderName)
+func getInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
+	httpInfo := &config.HttpInfo{}
+	httpInfo.RequestId = c.GetHeader(constants.RequestIdHeaderName)
 	// если request id не пришел с заголовком, генерим его, чтобы прокидывать дальше при http запросах
-	if appInfo.RequestId == "" {
-		appInfo.GenerateRequestId()
-		c.Request.Header.Add(constants.RequestIdHeaderName, appInfo.RequestId)
+	if httpInfo.RequestId == "" {
+		httpInfo.GenerateRequestId()
+		c.Request.Header.Add(constants.RequestIdHeaderName, httpInfo.RequestId)
 	}
 
-	appInfo.LanguageCode = c.GetHeader(constants.LanguageHeaderName)
+	httpInfo.LanguageCode = c.GetHeader(constants.LanguageHeaderName)
 
-	if appInfo.LanguageCode == "" {
-		appInfo.LanguageCode = constants.LangCodeRu
+	if httpInfo.LanguageCode == "" {
+		httpInfo.LanguageCode = constants2.LangCodeRu
 	}
 
-	appInfo.CityId, _ = strconv.Atoi(c.GetHeader(constants.CityHeaderName))
+	httpInfo.CacheControl = c.GetHeader(constants.CacheControlHeaderName)
+	httpInfo.RequestUrl = c.Request.URL.Path
+	httpInfo.RequestMethod = c.Request.Method
+	httpInfo.RequestScheme = c.Request.URL.Scheme
+	httpInfo.RequestHost = c.Request.Host
 
-	if appInfo.CityId == 0 {
-		appInfo.CityId = 443
-	}
-
-	appInfo.UserId, err = strconv.Atoi(c.GetHeader(constants.UserHeaderName))
-
-	if err != nil {
-		appInfo.UserId = 0
-	}
-
-	appInfo.CompanyId, err = strconv.Atoi(c.GetHeader(constants.CompanyIdHeaderName))
-
-	if err != nil {
-		appInfo.CompanyId = 0
-	}
-
-	appInfo.CurrentCompanyId, err = strconv.Atoi(c.GetHeader(constants.CurrentCompanyIdHeaderName))
-
-	if err != nil {
-		appInfo.CurrentCompanyId = 0
-	}
-
-	companyIdsString := c.GetHeader(constants.CompanyIdsHeaderName)
-	parts := strings.Split(companyIdsString, ",")
-
-	for _, part := range parts {
-		numStr := strings.TrimSpace(part)
-		num, _ := strconv.Atoi(numStr)
-		appInfo.CompanyIds = append(appInfo.CompanyIds, num)
-	}
-
-	appInfo.CacheControl = c.GetHeader(constants.CacheControlHeaderName)
-	appInfo.AppsflyerId = c.GetHeader(constants.AppsflyerHeaderName)
-	appInfo.Iin = c.GetHeader(constants.IinHeaderName)
-	appInfo.AuthToken = c.GetHeader(constants.AuthorizationHeaderName)
-	appInfo.RequestUrl = c.Request.URL.Path
-	appInfo.RequestMethod = c.Request.Method
-	appInfo.RequestScheme = c.Request.URL.Scheme
-	appInfo.RequestHost = c.Request.Host
+	return httpInfo
 }
 
-func GetContext(c *gin.Context) context.Context {
-	return context.WithValue(c.Request.Context(), debug.DebugKey, debug.GetDebugCollectorFromGinContext(c))
-}
+//func GetContext(c *gin.Context) context.Context {
+//	return context.WithValue(c.Request.Context(), debug.DebugKey, debug.GetDebugCollectorFromGinContext(c))
+//}
 
-func GetAppInfoFromGinContext(c *gin.Context) *config.AppInfo {
-	if dbg, ok := c.Request.Context().Value(constants.AppInfoKey).(*config.AppInfo); ok {
+func GetAppInfoFromGinContext(c *gin.Context) *baseConfig.AppInfo {
+	if dbg, ok := c.Request.Context().Value(constants2.AppInfoKey).(*baseConfig.AppInfo); ok {
 		return dbg
 	}
 
 	return nil
 }
 
-func GetAppInfo(c *gin.Context) *config.AppInfo {
-	value, exists := c.Get("app_info")
+func GetHttpInfoFromGinContext(c *gin.Context) *baseConfig.AppInfo {
+	if dbg, ok := c.Request.Context().Value(constants.HttpInfoKey).(*baseConfig.AppInfo); ok {
+		return dbg
+	}
+
+	return nil
+}
+
+func GetAppInfo(c *gin.Context) *baseConfig.AppInfo {
+	value, exists := c.Get(constants2.AppInfoKey)
 
 	if exists {
-		appInfo := value.(*config.AppInfo)
+		appInfo := value.(*baseConfig.AppInfo)
 
 		return appInfo
 	}
 
-	return getInstanceAppInfo(c, nil)
+	return getInstanceAppInfo(nil)
+}
+
+func GetHttpInfo(c *gin.Context) *config.HttpInfo {
+	value, exists := c.Get(constants.HttpInfoKey)
+
+	if exists {
+		httpInfo := value.(*config.HttpInfo)
+
+		return httpInfo
+	}
+
+	return getInstanceHttpInfo(c)
 }
 
 // ValidateRequestQuery - Валидация GET параметров HTTP реквеста
