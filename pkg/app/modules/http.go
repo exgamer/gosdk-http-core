@@ -35,7 +35,7 @@ func (m *HttpModule) Register(a *app.App) error {
 			return err
 		}
 
-		spew.Dump(httpConfig)
+		spew.Dump(httpConfig) //TODO удалить
 
 		m.HttpConfig = httpConfig
 	}
