@@ -1,4 +1,4 @@
-package modules
+package app
 
 import (
 	"context"
@@ -15,18 +15,18 @@ import (
 	"time"
 )
 
-type HttpModule struct {
+type HttpKernel struct {
 	HttpConfig            *config.HttpConfig
 	Router                *gin.Engine
 	Server                *http.Server
-	PrepareComponentsFunc func(app *app.App, module *HttpModule) error
+	PrepareComponentsFunc func(app *app.App, module *HttpKernel) error
 }
 
-func (m *HttpModule) Name() string {
+func (m *HttpKernel) Name() string {
 	return "http"
 }
 
-func (m *HttpModule) Register(a *app.App) error {
+func (m *HttpKernel) Register(a *app.App) error {
 	{
 		httpConfig := &config.HttpConfig{}
 		err := baseConfig.InitConfig(httpConfig)
@@ -71,7 +71,7 @@ func (m *HttpModule) Register(a *app.App) error {
 	return nil
 }
 
-func (m *HttpModule) Start(a *app.App) error {
+func (m *HttpKernel) Start(a *app.App) error {
 	go func() {
 		if err := m.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			if a != nil {
@@ -85,7 +85,7 @@ func (m *HttpModule) Start(a *app.App) error {
 	return nil
 }
 
-func (m *HttpModule) Stop(ctx context.Context) error {
+func (m *HttpKernel) Stop(ctx context.Context) error {
 	if m.Server == nil {
 		return nil
 	}

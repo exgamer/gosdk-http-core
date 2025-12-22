@@ -19,32 +19,13 @@ HTTP-модуль предоставляет готовую интеграцию
 
 ---
 
-## Структура пакета
-
-```
-pkg/
- ├── app/
- │   └── modules/
- │       └── http.go
- ├── config/
- │   ├── http_config.go
- │   └── http_info.go
- ├── constants/
- ├── gin/
- ├── middleware/
- ├── helpers/
- └── structures/
-```
-
----
-
 ## Подключение модуля
 
 ### Регистрация
 
 ```go
-appInstance.RegisterModule(&modules.HttpModule{
-    PrepareComponentsFunc: func(app *app.App, module *modules.HttpModule) error {
+appInstance.RegisterKernel(&app.HttpKernel{
+    PrepareComponentsFunc: func(app *app.App, kernel *app.HttpKernel) error {
         router := module.Router
 
         router.GET("/health", func(c *gin.Context) {
@@ -61,7 +42,7 @@ appInstance.RegisterModule(&modules.HttpModule{
 ### Запуск
 
 ```go
-if err := appInstance.RunModule("http"); err != nil {
+if err := appInstance.RunKernel("http"); err != nil {
     log.Fatal(err)
 }
 ```
@@ -79,12 +60,12 @@ appInstance.WaitForShutdown()
 ## HttpModule
 
 ```go
-type HttpModule struct {
+type HttpKernel struct {
     HttpConfig *config.HttpConfig
     Router     *gin.Engine
     Server     *http.Server
 
-    PrepareComponentsFunc func(app *app.App, module *HttpModule) error
+    PrepareComponentsFunc func(app *app.App, kernel *HttpKernel) error
 }
 ```
 
@@ -94,7 +75,7 @@ type HttpModule struct {
 
 ### Register(app)
 
-Вызывается при `RegisterModule`.
+Вызывается при `RegisterKernel`.
 
 Внутри:
 
@@ -111,7 +92,7 @@ type HttpModule struct {
 
 ### Start(app)
 
-Вызывается при `RunModule("http")`.
+Вызывается при `RunKernel("http")`.
 
 Внутри:
 
@@ -210,8 +191,8 @@ func (m *HttpModule) Stop(ctx context.Context) error {
 ## Пример использования
 
 ```go
-httpModule := &modules.HttpModule{
-    PrepareComponentsFunc: func(app *app.App, module *modules.HttpModule) error {
+httpModule := &modules.HttpKernel{
+    PrepareComponentsFunc: func(app *app.App, kernel *app.HttpModule) error {
         api := module.Router.Group("/api")
 
         api.GET("/ping", func(c *gin.Context) {
