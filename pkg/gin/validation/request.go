@@ -6,7 +6,6 @@ import (
 
 // Request - HTTP запрос
 type Request struct {
-	LangCode string `swaggerignore:"true"`
 }
 
 func (r *Request) ValidationMessage(fe validator.FieldError) string {
