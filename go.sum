@@ -86,6 +86,7 @@ github.com/exgamer/gosdk-core v0.0.5-dev/go.mod h1:dE85IJlX+YLi99CoOkuuzrNGD71fN
 github.com/exgamer/gosdk-core v0.0.6-dev/go.mod h1:dE85IJlX+YLi99CoOkuuzrNGD71fNr//at4pyBkuiPQ=
 github.com/exgamer/gosdk-core v0.0.7-dev/go.mod h1:dE85IJlX+YLi99CoOkuuzrNGD71fNr//at4pyBkuiPQ=
 github.com/exgamer/gosdk-core v0.0.8-dev/go.mod h1:dE85IJlX+YLi99CoOkuuzrNGD71fNr//at4pyBkuiPQ=
+github.com/exgamer/gosdk-core v0.0.9-dev/go.mod h1:dE85IJlX+YLi99CoOkuuzrNGD71fNr//at4pyBkuiPQ=
 github.com/frankban/quicktest v1.14.4 h1:g2rn0vABPOOXmZUj+vbmUp0lPoXEMuhTpIluN0XL9UY=
 github.com/frankban/quicktest v1.14.4/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.6.0 h1:n+5WquG0fcWoWp6xPWfHdbskMCQaFnG6PfBrh1Ky4HY=

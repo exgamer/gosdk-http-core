@@ -26,7 +26,7 @@ func (m *HttpKernel) Name() string {
 	return "http"
 }
 
-func (m *HttpKernel) Register(a *app.App) error {
+func (m *HttpKernel) Init(a *app.App) error {
 	{
 		httpConfig := &config.HttpConfig{}
 		err := baseConfig.InitConfig(httpConfig)
