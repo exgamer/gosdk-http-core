@@ -6,6 +6,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/exgamer/gosdk-core/pkg/app"
 	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
+	"github.com/exgamer/gosdk-core/pkg/di"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	ginHelper "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/getsentry/sentry-go"
@@ -18,10 +19,9 @@ import (
 const HttpKernelName = "http"
 
 type HttpKernel struct {
-	HttpConfig            *config.HttpConfig
-	Router                *gin.Engine
-	Server                *http.Server
-	PrepareComponentsFunc func(app *app.App, module *HttpKernel) error
+	HttpConfig *config.HttpConfig
+	Router     *gin.Engine
+	Server     *http.Server
 }
 
 func (m *HttpKernel) Name() string {
@@ -40,6 +40,8 @@ func (m *HttpKernel) Init(a *app.App) error {
 		spew.Dump(httpConfig) //TODO удалить
 
 		m.HttpConfig = httpConfig
+
+		di.Register(a.Container, m.HttpConfig)
 	}
 	// Инициализация сентри
 	if m.HttpConfig.SentryDsn != "" {
@@ -54,11 +56,7 @@ func (m *HttpKernel) Init(a *app.App) error {
 
 	m.Router = ginHelper.InitRouter(a.BaseConfig, m.HttpConfig)
 
-	if m.PrepareComponentsFunc != nil {
-		if err := m.PrepareComponentsFunc(a, m); err != nil {
-			return err
-		}
-	}
+	di.Register(a.Container, m.Router)
 
 	m.Server = &http.Server{
 		Addr:    m.HttpConfig.ServerAddress,
@@ -78,6 +76,7 @@ func (m *HttpKernel) Start(a *app.App) error {
 		if err := m.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			if a != nil {
 				a.Fail(fmt.Errorf("http server: %w", err))
+
 				return
 			}
 			log.Printf("http server error: %v", err)
