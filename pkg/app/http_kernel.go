@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+const HttpKernelName = "http"
+
 type HttpKernel struct {
 	HttpConfig            *config.HttpConfig
 	Router                *gin.Engine
@@ -23,7 +25,7 @@ type HttpKernel struct {
 }
 
 func (m *HttpKernel) Name() string {
-	return "http"
+	return HttpKernelName
 }
 
 func (m *HttpKernel) Init(a *app.App) error {
