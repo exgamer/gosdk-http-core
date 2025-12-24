@@ -28,10 +28,6 @@ import (
 
 // InitRouter Базовая инициализация gin
 func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig) *gin.Engine {
-	if baseConfig.AppEnv == "prod" {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
 	// Options
 	router := gin.New()
 	prefix := httpConfig.SwaggerPrefix

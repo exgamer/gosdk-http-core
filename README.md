@@ -1,221 +1,149 @@
-# HTTP Module (Gin)
+# gosdk-http-core
 
-HTTP-модуль предоставляет готовую интеграцию **Gin** в модульную архитектуру `App`
-с поддержкой lifecycle, middleware, Sentry и graceful shutdown.
+`gosdk-http-core` — HTTP kernel для Go-приложений, построенных на базе `gosdk-core`.
+Пакет инкапсулирует инициализацию HTTP-сервера, роутера и middleware и подключается к приложению как **kernel**.
 
-Модуль предназначен для использования в сервисах,
-построенных на `gosdk-http-core` и `Application Core`.
-
----
-
-## Возможности
-
-- Инициализация `gin.Engine`
-- Подключение middleware (logger, recovery, rate limit и др.)
-- Интеграция с Sentry
-- Централизованный `App` context
-- Graceful shutdown HTTP-сервера
-- Расширение через `PrepareComponentsFunc`
+Основная цель — дать единый и предсказуемый способ поднятия HTTP (REST) слоя поверх core SDK.
 
 ---
 
-## Подключение модуля
+## 📦 Возможности
 
-### Регистрация
+- 🌐 HTTP kernel для `gosdk-core`
+- 🚀 Инициализация HTTP сервера
+- 🧭 Поддержка роутера (Gin)
+- 🧩 Регистрация middleware
+- ⚙️ Конфигурация через config
+- ♻️ Корректный shutdown сервера
+- 🧠 Интеграция с DI контейнером
+
+---
+
+## 📁 Структура пакета
+
+```
+pkg/
+├── app/            # HTTP kernel
+├── gin/            # Gin router helpers
+├── middleware/     # Общие middleware
+```
+
+---
+
+## 🚀 Установка
+
+```bash
+go get github.com/exgamer/gosdk-http-core
+```
+
+---
+
+[Что доступно в DI из коробки](pkg/app/DI_FUNCTIONS_README.MD)
+
+---
+
+## 🧠 Концепция HTTP Kernel
+
+HTTP kernel — это kernel приложения, который:
+- регистрирует HTTP-зависимости в DI
+- инициализирует роутер
+- поднимает HTTP сервер
+- корректно завершает работу при shutdown
+
+Kernel реализует интерфейс `KernelInterface` из `gosdk-core`.
+
+---
+
+## 🔌 Регистрация HTTP Kernel
 
 ```go
-appInstance.RegisterKernel(&app.HttpKernel{
-    PrepareComponentsFunc: func(app *app.App, kernel *app.HttpKernel) error {
-        router := module.Router
+httpKernel := httpkernel.NewHttpKernel()
 
-        router.GET("/health", func(c *gin.Context) {
-            c.JSON(200, gin.H{"status": "ok"})
-        })
+app.RegisterKernel(httpKernel)
+```
 
-        return nil
-    },
+---
+
+## ⚙️ Конфигурация
+
+HTTP kernel использует конфигурацию из `pkg/config`.
+
+Пример env-переменных:
+
+```env
+SERVER_ADDRESS=0.0.0.0:8090
+SWAGGER_PREFIX=rest-template
+HANDLER_TIMEOUT=30
+SENTRY_DSN=
+GIN_MODE=debug
+```
+
+---
+
+## 🧩 Работа с роутером
+
+Роутер (Gin) регистрируется в DI и доступен в бизнес-модулях.
+
+```go
+router, err := app.GetRouter(app)
+if err != nil {
+    return err
+}
+
+baseConfig, err := app.GetBaseConfig(a) // из `gosdk-core`
+if err != nil {
+    return err
+}
+
+service.Use(middleware.RequestInfoMiddleware(baseConfig))
+service.Use(middleware.LoggerMiddleware())
+service.Use(middleware.FormattedResponseMiddleware())
+
+router.GET("/health", func(c *gin.Context) {
+    c.JSON(200, gin.H{"status": "ok"})
 })
 ```
 
 ---
 
-### Запуск
+## 🧱 Middleware
 
-```go
-if err := appInstance.RunKernel("http"); err != nil {
-    log.Fatal(err)
-}
-```
+Middleware регистрируются централизованно внутри kernel.
 
----
-
-### Ожидание завершения
-
-```go
-appInstance.WaitForShutdown()
-```
+Примеры:
+- logger
+- recovery
+- request-id
+- cors
 
 ---
 
-## HttpModule
+## ♻️ Graceful Shutdown
 
-```go
-type HttpKernel struct {
-    HttpConfig *config.HttpConfig
-    Router     *gin.Engine
-    Server     *http.Server
-
-    PrepareComponentsFunc func(app *app.App, kernel *HttpKernel) error
-}
-```
+HTTP kernel автоматически:
+- останавливает приём новых соединений
+- дожидается завершения активных запросов
+- завершает сервер по контексту приложения
 
 ---
 
-## Жизненный цикл
+## 🧪 Рекомендации
 
-### Register(app)
-
-Вызывается при `RegisterKernel`.
-
-Внутри:
-
-- загрузка `HttpConfig`
-- инициализация Sentry (если указан DSN)
-- создание `gin.Engine`
-- подключение middleware
-- вызов `PrepareComponentsFunc`
-
-⚠️ **Важно:**  
-`Register()` не должен запускать сервер или блокировать поток.
+- ❌ не создавайте HTTP сервер вручную
+- ✅ используйте роутер из DI
+- ✅ регистрируйте роуты в бизнес-модулях
+- ❌ не храните бизнес-логику в middleware
 
 ---
 
-### Start(app)
+## 📌 Используется вместе с
 
-Вызывается при `RunKernel("http")`.
-
-Внутри:
-
-- запуск HTTP-сервера в goroutine
-- обработка ошибок сервера
-- при фатальной ошибке вызывается `app.Fail(err)`
-
-Пример логики:
-
-```go
-go func() {
-    if err := m.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-        app.Fail(err)
-    }
-}()
-```
+- `gosdk-core`
+- Gin
+- internal business modules
 
 ---
 
-### Stop(ctx)
+## 📝 License
 
-Вызывается при graceful shutdown приложения.
-
-Внутри:
-
-- `Server.Shutdown(ctx)`
-- `sentry.Flush()`
-
-Пример:
-
-```go
-func (m *HttpModule) Stop(ctx context.Context) error {
-    err := m.Server.Shutdown(ctx)
-    sentry.Flush(2 * time.Second)
-    return err
-}
-```
-
----
-
-## Конфигурация
-
-Используется `HttpConfig`, загружаемый из env / config-файлов.
-
-Основные параметры:
-
-- `SERVER_ADDRESS`
-- `SENTRY_DSN`
-- `READ_TIMEOUT`
-- `WRITE_TIMEOUT`
-- `IDLE_TIMEOUT`
-
----
-
-## Middleware
-
-Пакет `middleware` содержит готовые middleware:
-
-- Logger
-- Recovery
-- Request info
-- Rate limiter
-- Форматированные ответы
-
-Все middleware подключаются в `ginHelper.InitRouter()`.
-
----
-
-## Error handling
-
-Модуль использует:
-
-- централизованные структуры ошибок
-- единый формат HTTP-ответов
-- middleware для panic recovery
-- Sentry для критических ошибок
-
----
-
-## Рекомендации
-
-### Делать
-
-- регистрировать роуты через `PrepareComponentsFunc`
-- использовать `module.Router`
-- обрабатывать ошибки через `app.Fail(err)`
-
-### Не делать
-
-- запускать сервер в `Register()`
-- блокировать `Start()`
-- использовать `panic` или `log.Fatal`
-
----
-
-## Пример использования
-
-```go
-httpModule := &modules.HttpKernel{
-    PrepareComponentsFunc: func(app *app.App, kernel *app.HttpModule) error {
-        api := module.Router.Group("/api")
-
-        api.GET("/ping", func(c *gin.Context) {
-            c.JSON(200, gin.H{"pong": true})
-        })
-
-        return nil
-    },
-}
-
-appInstance.RegisterModule(httpModule)
-appInstance.RunModule("http")
-appInstance.WaitForShutdown()
-```
-
----
-
-## Итог
-
-HTTP-модуль обеспечивает:
-
-- чистую интеграцию Gin
-- единый lifecycle
-- безопасный shutdown
-- расширяемость
-- готовность к production
+MIT или внутренняя лицензия компании
