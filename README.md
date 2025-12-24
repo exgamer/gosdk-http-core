@@ -95,9 +95,9 @@ if err != nil {
     return err
 }
 
-service.Use(middleware.RequestInfoMiddleware(baseConfig))
-service.Use(middleware.LoggerMiddleware())
-service.Use(middleware.FormattedResponseMiddleware())
+service.Use(middleware.RequestInfoMiddleware(baseConfig))  // мидлвейр который записывает в контекст данные о приложении и запросе
+service.Use(middleware.LoggerMiddleware())                 // мидлвейр который логирует запросы
+service.Use(middleware.FormattedResponseMiddleware())      // мидлвейр который обрабатывает ответ от контроллера
 
 router.GET("/health", func(c *gin.Context) {
     c.JSON(200, gin.H{"status": "ok"})
