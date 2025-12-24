@@ -6,6 +6,8 @@ import (
 	"fmt"
 	config2 "github.com/exgamer/gosdk-core/pkg/config"
 	"github.com/exgamer/gosdk-core/pkg/constants"
+	"github.com/exgamer/gosdk-http-core/pkg/config"
+	constants2 "github.com/exgamer/gosdk-http-core/pkg/constants"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
@@ -127,6 +129,13 @@ func FormattedResponse(c *gin.Context) {
 	if exists {
 		appInfo := value.(*config2.AppInfo)
 		serviceName = appInfo.ServiceName
+	}
+
+	value, exists = c.Get(constants2.HttpInfoKey)
+
+	if exists {
+		httpInfo := value.(*config.HttpInfo)
+		requestId = httpInfo.RequestId
 	}
 
 	responseData := gin.H{
