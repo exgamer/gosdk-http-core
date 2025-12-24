@@ -42,6 +42,10 @@ go get github.com/exgamer/gosdk-http-core
 
 ---
 
+[Структуры описывающие HTTP ответы](pkg/structures/HTTP_RESPONSES.MD)
+
+---
+
 ## 🧠 Концепция HTTP Kernel
 
 HTTP kernel — это kernel приложения, который:
