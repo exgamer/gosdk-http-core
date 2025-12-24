@@ -152,13 +152,13 @@ func FormattedResponse(c *gin.Context) {
 	//		dbg,
 	//	}
 	//} else {
-	//	response = struct {
-	//		Success bool        `json:"success"`
-	//		Data    interface{} `json:"data"`
-	//	}{
-	//		false,
-	//		responseData,
-	//	}
+	response = struct {
+		Success bool        `json:"success"`
+		Data    interface{} `json:"data"`
+	}{
+		false,
+		responseData,
+	}
 	//}
 
 	jsonBytes, err := json.Marshal(response)
