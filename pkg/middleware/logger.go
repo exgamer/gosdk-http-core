@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	exception2 "github.com/exgamer/gosdk-core/pkg/exception"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/exgamer/gosdk-http-core/pkg/logger"
@@ -29,17 +28,17 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 		appExceptionObject, exists := c.Get("exception")
 
-		if exists {
-			appException := exception2.AppException{}
-			mapstructure.Decode(appExceptionObject, &appException)
-			sentry.WithScope(func(scope *sentry.Scope) {
-				scope.SetLevel(sentry.LevelError)
-				sentry.CaptureException(appException.Error)
-			})
-			logger.FormattedErrorWithAppInfo(appInfo, httpInfo, appException.Error.Error())
-
-			return
-		}
+		//if exists {
+		//	appException := exception2.AppException{}
+		//	mapstructure.Decode(appExceptionObject, &appException)
+		//	sentry.WithScope(func(scope *sentry.Scope) {
+		//		scope.SetLevel(sentry.LevelError)
+		//		sentry.CaptureException(appException.Error)
+		//	})
+		//	logger.FormattedErrorWithAppInfo(appInfo, httpInfo, appException.Error.Error())
+		//
+		//	return
+		//}
 
 		if exists {
 			appException := exception.HttpException{}

@@ -129,21 +129,21 @@ func getInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
 //	return context.WithValue(c.Request.Context(), debug.DebugKey, debug.GetDebugCollectorFromGinContext(c))
 //}
 
-func GetAppInfoFromGinContext(c *gin.Context) *baseConfig.AppInfo {
-	if dbg, ok := c.Request.Context().Value(constants2.AppInfoKey).(*baseConfig.AppInfo); ok {
-		return dbg
-	}
-
-	return nil
-}
-
-func GetHttpInfoFromGinContext(c *gin.Context) *baseConfig.AppInfo {
-	if dbg, ok := c.Request.Context().Value(constants.HttpInfoKey).(*baseConfig.AppInfo); ok {
-		return dbg
-	}
-
-	return nil
-}
+//func GetAppInfoFromGinContext(c *gin.Context) *baseConfig.AppInfo {
+//	if dbg, ok := c.Request.Context().Value(constants2.AppInfoKey).(*baseConfig.AppInfo); ok {
+//		return dbg
+//	}
+//
+//	return nil
+//}
+//
+//func GetHttpInfoFromGinContext(c *gin.Context) *config.HttpInfo {
+//	if dbg, ok := c.Request.Context().Value(constants.HttpInfoKey).(*config.HttpInfo); ok {
+//		return dbg
+//	}
+//
+//	return nil
+//}
 
 func GetAppInfo(c *gin.Context) *baseConfig.AppInfo {
 	value, exists := c.Get(constants2.AppInfoKey)
