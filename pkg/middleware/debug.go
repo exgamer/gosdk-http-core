@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"github.com/exgamer/gosdk-core/pkg/debug"
+	"github.com/exgamer/gosdk-core/pkg/helpers"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/gin-gonic/gin"
 )
@@ -9,6 +10,12 @@ import (
 // DebugMiddleware кладёт DebugCollector в context запроса и считает TotalTime в конце
 func DebugMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		appInfo := helpers.GetAppInfoFromContext(c.Request.Context())
+
+		if appInfo.DebugMode == false {
+			return
+		}
+
 		collector := debug.NewDebugCollector()
 		if httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context()); httpInfo != nil {
 			collector.Meta["url"] = httpInfo.RequestUrl
