@@ -122,7 +122,6 @@ func FormattedResponse(c *gin.Context) {
 
 	appException := exception.HttpException{}
 	mapstructure.Decode(appExceptionObject, &appException)
-	fmt.Printf("%+v\n", appException)
 	serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
 	requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
 	value, exists := c.Get(constants.AppInfoKey)
