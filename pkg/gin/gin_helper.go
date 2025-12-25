@@ -1,6 +1,7 @@
 package gin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
@@ -81,14 +82,14 @@ func Success(c *gin.Context, data any) {
 }
 
 func SetAppInfo(c *gin.Context, baseConfig *baseConfig.BaseConfig) {
-	c.Set(constants2.AppInfoKey, getInstanceAppInfo(baseConfig))
+	c.Set(constants2.AppInfoKey, GetInstanceAppInfo(baseConfig))
 }
 
 func SetHttpInfo(c *gin.Context) {
-	c.Set(constants.HttpInfoKey, getInstanceHttpInfo(c))
+	c.Set(constants.HttpInfoKey, GetInstanceHttpInfo(c))
 }
 
-func getInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
+func GetInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
 	appInfo := &baseConfig.AppInfo{}
 	appInfo.AppEnv = "UNKNOWN (maybe you not used RequestMiddleware)"
 	appInfo.ServiceName = "UNKNOWN (maybe you not used RequestMiddleware)"
@@ -101,7 +102,7 @@ func getInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
 	return appInfo
 }
 
-func getInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
+func GetInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
 	httpInfo := &config.HttpInfo{}
 	httpInfo.RequestId = c.GetHeader(constants.RequestIdHeaderName)
 	// если request id не пришел с заголовком, генерим его, чтобы прокидывать дальше при http запросах
@@ -123,6 +124,24 @@ func getInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
 	httpInfo.RequestHost = c.Request.Host
 
 	return httpInfo
+}
+
+func GetAppInfoFromContext(ctx context.Context) *baseConfig.AppInfo {
+	if v := ctx.Value(constants2.AppInfoKey); v != nil {
+		if ai, ok := v.(*baseConfig.AppInfo); ok {
+			return ai
+		}
+	}
+	return nil
+}
+
+func GetHttpInfoFromContext(ctx context.Context) *config.HttpInfo {
+	if v := ctx.Value(constants.HttpInfoKey); v != nil {
+		if hi, ok := v.(*config.HttpInfo); ok {
+			return hi
+		}
+	}
+	return nil
 }
 
 //func GetContext(c *gin.Context) context.Context {
@@ -154,7 +173,7 @@ func GetAppInfo(c *gin.Context) *baseConfig.AppInfo {
 		return appInfo
 	}
 
-	return getInstanceAppInfo(nil)
+	return GetInstanceAppInfo(nil)
 }
 
 func GetHttpInfo(c *gin.Context) *config.HttpInfo {
@@ -166,7 +185,7 @@ func GetHttpInfo(c *gin.Context) *config.HttpInfo {
 		return httpInfo
 	}
 
-	return getInstanceHttpInfo(c)
+	return GetInstanceHttpInfo(c)
 }
 
 // ValidateRequestQuery - Валидация GET параметров HTTP реквеста

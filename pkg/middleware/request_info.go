@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"context"
-	config2 "github.com/exgamer/gosdk-core/pkg/config"
+	"github.com/exgamer/gosdk-core/pkg/app"
 	constants2 "github.com/exgamer/gosdk-core/pkg/constants"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
@@ -10,16 +10,22 @@ import (
 )
 
 // RequestInfoMiddleware Middleware заполняющий данные запроса
-func RequestInfoMiddleware(baseConfig *config2.BaseConfig) gin.HandlerFunc {
+func RequestInfoMiddleware(a *app.App) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		gin2.SetAppInfo(c, baseConfig)
-		appInfo := gin2.GetAppInfo(c)
-		ctx := context.WithValue(c.Request.Context(), constants2.AppInfoKey, appInfo)
-		gin2.SetHttpInfo(c)
-		httpInfo := gin2.GetHttpInfo(c)
-		ctx = context.WithValue(c.Request.Context(), constants.HttpInfoKey, httpInfo)
-		c.Request = c.Request.WithContext(ctx)
+		baseConfig, err := app.GetBaseConfig(a)
 
+		if err != nil {
+			return
+		}
+
+		appInfo := gin2.GetInstanceAppInfo(baseConfig)
+		httpInfo := gin2.GetInstanceHttpInfo(c)
+
+		ctx := c.Request.Context()
+		ctx = context.WithValue(ctx, constants2.AppInfoKey, appInfo)
+		ctx = context.WithValue(ctx, constants.HttpInfoKey, httpInfo)
+
+		c.Request = c.Request.WithContext(ctx)
 		//if c.GetHeader("Apelsin") == "sanya" {
 		//	appInfo := gin2.GetAppInfo(c)
 		//

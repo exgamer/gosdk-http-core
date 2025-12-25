@@ -6,6 +6,7 @@ import (
 	"fmt"
 	config2 "github.com/exgamer/gosdk-core/pkg/config"
 	"github.com/exgamer/gosdk-core/pkg/constants"
+	"github.com/exgamer/gosdk-core/pkg/debug"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	constants2 "github.com/exgamer/gosdk-http-core/pkg/constants"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
@@ -78,26 +79,26 @@ func FormattedResponse(c *gin.Context) {
 		data, _ := c.Get("data")
 		var response interface{}
 
-		//if dbg := debug.GetDebugCollectorFromGinContext(c); dbg != nil {
-		//	dbg.CalculateTotalTime()
-		//	response = struct {
-		//		Success bool        `json:"success"`
-		//		Data    interface{} `json:"data"`
-		//		Debug   interface{} `json:"debug"`
-		//	}{
-		//		true,
-		//		data,
-		//		dbg,
-		//	}
-		//} else {
-		response = struct {
-			Success bool        `json:"success"`
-			Data    interface{} `json:"data"`
-		}{
-			true,
-			data,
+		if dbg := debug.GetDebugFromContext(c.Request.Context()); dbg != nil {
+			dbg.CalculateTotalTime()
+			response = struct {
+				Success bool        `json:"success"`
+				Data    interface{} `json:"data"`
+				Debug   interface{} `json:"debug"`
+			}{
+				true,
+				data,
+				dbg,
+			}
+		} else {
+			response = struct {
+				Success bool        `json:"success"`
+				Data    interface{} `json:"data"`
+			}{
+				true,
+				data,
+			}
 		}
-		//}
 
 		jsonBytes, err := json.Marshal(response)
 
@@ -149,26 +150,26 @@ func FormattedResponse(c *gin.Context) {
 
 	var response interface{}
 
-	//if dbg := debug.GetDebugCollectorFromGinContext(c); dbg != nil {
-	//	dbg.CalculateTotalTime()
-	//	response = struct {
-	//		Success bool        `json:"success"`
-	//		Data    interface{} `json:"data"`
-	//		Debug   interface{} `json:"debug"`
-	//	}{
-	//		false,
-	//		responseData,
-	//		dbg,
-	//	}
-	//} else {
-	response = struct {
-		Success bool        `json:"success"`
-		Data    interface{} `json:"data"`
-	}{
-		false,
-		responseData,
+	if dbg := debug.GetDebugFromContext(c.Request.Context()); dbg != nil {
+		dbg.CalculateTotalTime()
+		response = struct {
+			Success bool        `json:"success"`
+			Data    interface{} `json:"data"`
+			Debug   interface{} `json:"debug"`
+		}{
+			false,
+			responseData,
+			dbg,
+		}
+	} else {
+		response = struct {
+			Success bool        `json:"success"`
+			Data    interface{} `json:"data"`
+		}{
+			false,
+			responseData,
+		}
 	}
-	//}
 
 	jsonBytes, err := json.Marshal(response)
 
