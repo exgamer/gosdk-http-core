@@ -97,6 +97,7 @@ func GetInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
 	if appConfig != nil {
 		appInfo.AppEnv = appConfig.AppEnv
 		appInfo.ServiceName = appConfig.Name
+		appInfo.DebugMode = appConfig.Debug
 	}
 
 	return appInfo
