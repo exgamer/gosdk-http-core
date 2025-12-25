@@ -10,15 +10,16 @@ import (
 func DebugMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		collector := debug.NewDebugCollector()
+		if httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context()); httpInfo != nil {
+			collector.Meta["url"] = httpInfo.RequestUrl
+			collector.Meta["method"] = httpInfo.RequestMethod
+			collector.Meta["id"] = httpInfo.RequestId
+		}
+
 		// положили в request context
 		c.Request = c.Request.WithContext(debug.WithDebugCollector(c.Request.Context(), collector))
 
 		c.Next()
-
-		httpConfig := gin2.GetHttpInfoFromContext(c.Request.Context())
-		collector.Meta["url"] = httpConfig.RequestUrl
-		collector.Meta["method"] = httpConfig.RequestMethod
-		collector.Meta["id"] = httpConfig.RequestId
 
 		collector.CalculateTotalTime()
 	}
