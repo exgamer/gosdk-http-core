@@ -9,6 +9,7 @@ import (
 	"github.com/exgamer/gosdk-core/pkg/di"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	ginHelper "github.com/exgamer/gosdk-http-core/pkg/gin"
+	"github.com/exgamer/gosdk-http-core/pkg/metrics"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"log"
@@ -57,6 +58,16 @@ func (m *HttpKernel) Init(a *app.App) error {
 	m.Router = ginHelper.InitRouter(a.BaseConfig, m.HttpConfig)
 
 	di.Register(a.Container, m.Router)
+
+	appConfig, err := app.GetBaseConfig(a)
+
+	if err != nil {
+		return err
+	}
+
+	metricsCollector := metrics.NewCollector(appConfig.Name)
+
+	di.Register(a.Container, metricsCollector)
 
 	m.Server = &http.Server{
 		Addr:    m.HttpConfig.ServerAddress,

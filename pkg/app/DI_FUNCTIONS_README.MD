@@ -11,3 +11,4 @@ Http конфиг приложения:
 ```go
 httpConfig := app.GetHttpConfig(a *app.App) (*config.HttpConfig, error)
 ```
+
