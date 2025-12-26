@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	config2 "github.com/exgamer/gosdk-core/pkg/config"
-	"github.com/exgamer/gosdk-core/pkg/constants"
 	"github.com/exgamer/gosdk-core/pkg/debug"
-	"github.com/exgamer/gosdk-http-core/pkg/config"
-	constants2 "github.com/exgamer/gosdk-http-core/pkg/constants"
+	"github.com/exgamer/gosdk-core/pkg/helpers"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
+	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
 	"net/http"
@@ -122,17 +120,15 @@ func FormattedResponse(c *gin.Context) {
 	mapstructure.Decode(appExceptionObject, &appException)
 	serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
 	requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
-	value, exists := c.Get(constants.AppInfoKey)
+	appInfo := helpers.GetAppInfoFromContext(c.Request.Context())
 
-	if exists {
-		appInfo := value.(*config2.AppInfo)
+	if appInfo != nil {
 		serviceName = appInfo.ServiceName
 	}
 
-	value, exists = c.Get(constants2.HttpInfoKey)
+	httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context())
 
 	if exists {
-		httpInfo := value.(*config.HttpInfo)
 		requestId = httpInfo.RequestId
 	}
 

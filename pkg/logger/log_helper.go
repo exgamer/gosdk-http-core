@@ -50,5 +50,5 @@ func FormattedLogWithAppInfo(appInfo *config.AppInfo, httpInfo *config2.HttpInfo
 
 // FormattedErrorWithAppInfo Форматированный лог ошибки для RequestData
 func FormattedErrorWithAppInfo(appInfo *config.AppInfo, httpInfo *config2.HttpInfo, message string) {
-	FormattedInfo(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, 1, httpInfo.RequestId, message)
+	FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, 1, httpInfo.RequestId, message)
 }
