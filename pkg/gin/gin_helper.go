@@ -165,29 +165,29 @@ func GetHttpInfoFromContext(ctx context.Context) *config.HttpInfo {
 //	return nil
 //}
 
-func GetAppInfo(c *gin.Context) *baseConfig.AppInfo {
-	value, exists := c.Get(constants2.AppInfoKey)
-
-	if exists {
-		appInfo := value.(*baseConfig.AppInfo)
-
-		return appInfo
-	}
-
-	return GetInstanceAppInfo(nil)
-}
-
-func GetHttpInfo(c *gin.Context) *config.HttpInfo {
-	value, exists := c.Get(constants.HttpInfoKey)
-
-	if exists {
-		httpInfo := value.(*config.HttpInfo)
-
-		return httpInfo
-	}
-
-	return GetInstanceHttpInfo(c)
-}
+//func GetAppInfo(c *gin.Context) *baseConfig.AppInfo {
+//	value, exists := c.Get(constants2.AppInfoKey)
+//
+//	if exists {
+//		appInfo := value.(*baseConfig.AppInfo)
+//
+//		return appInfo
+//	}
+//
+//	return GetInstanceAppInfo(nil)
+//}
+//
+//func GetHttpInfo(c *gin.Context) *config.HttpInfo {
+//	value, exists := c.Get(constants.HttpInfoKey)
+//
+//	if exists {
+//		httpInfo := value.(*config.HttpInfo)
+//
+//		return httpInfo
+//	}
+//
+//	return GetInstanceHttpInfo(c)
+//}
 
 // ValidateRequestQuery - Валидация GET параметров HTTP реквеста
 func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {

@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/exgamer/gosdk-core/pkg/helpers"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/exgamer/gosdk-http-core/pkg/logger"
@@ -33,8 +34,8 @@ func LoggerMiddleware() gin.HandlerFunc {
 		c.Next()
 		endTime := time.Now()
 		latency := endTime.Sub(startTime)
-		appInfo := gin2.GetAppInfo(c)
-		httpInfo := gin2.GetHttpInfo(c)
+		appInfo := helpers.GetAppInfoFromContext(c.Request.Context())
+		httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context())
 
 		for _, err := range c.Errors {
 			sentry.CaptureException(err)
