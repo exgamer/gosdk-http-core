@@ -46,22 +46,6 @@ func LoggerMiddleware() gin.HandlerFunc {
 		if exists {
 			appException := exception.HttpException{}
 			mapstructure.Decode(appExceptionObject, &appException)
-			sentry.WithScope(func(scope *sentry.Scope) {
-				if appException.Code >= http.StatusBadRequest && appException.Code < http.StatusInternalServerError {
-					scope.SetLevel(sentry.LevelWarning)
-				} else {
-					scope.SetLevel(sentry.LevelError)
-				}
-
-				scope.SetExtras(map[string]interface{}{
-					"headers": headers,
-					"query":   queryParams,
-					"request": string(requestBody),
-					"status":  c.Writer.Status(),
-				})
-
-				sentry.CaptureException(appException.Error)
-			})
 			logger.FormattedErrorWithAppInfo(appInfo, httpInfo, appException.Error.Error())
 
 			return

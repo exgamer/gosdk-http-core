@@ -97,6 +97,7 @@ service.Use(middleware.LoggerMiddleware())                 // мидлвейр �
 service.Use(middleware.FormattedResponseMiddleware())      // мидлвейр который обрабатывает ответ от контроллера
 service.Use(middleware.MetricsMiddleware())                // мидлвейр который записывает в метрики прометея данные о вызванных эндпойнтах и времени работы (расширяет эндпойнт /metrics)
 service.Use(middleware.DebugMiddleware())                  // дебаг инфа в ответе от сервиса  (работает только если DEBUG=true)
+service.Use(middleware.SentryMiddleware())                  // мидлвейр для отправки ошибок в сентри
 
 router.GET("/health", func(c *gin.Context) {
     c.JSON(200, gin.H{"status": "ok"})
