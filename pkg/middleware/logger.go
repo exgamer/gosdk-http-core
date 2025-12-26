@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -78,8 +77,6 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 		messageBuilder.WriteString("Exec time:" + latency.String())
 
-		log.Println(messageBuilder.String())
-
 		logger.FormattedInfo(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, c.Writer.Status(), httpInfo.RequestId, messageBuilder.String())
 	}
 }
@@ -119,7 +116,7 @@ func queryToJSON(q url.Values) string {
 
 func bodyToPrettyJSON(body []byte) string {
 	if len(body) == 0 {
-		return ""
+		return "{}"
 	}
 
 	var out bytes.Buffer
