@@ -1,4 +1,4 @@
 package helpers
 
-const DefaultPaginationPage int = 1
-const DefaultPaginationPerPage int = 30
+const DefaultPaginationPage uint = 1
+const DefaultPaginationPerPage uint = 30

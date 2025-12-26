@@ -1,6 +1,6 @@
 package helpers
 
 type PagerRequest struct {
-	Page    int `form:"page"`
-	PerPage int `form:"per_page"`
+	Page    uint `form:"page"`
+	PerPage uint `form:"per_page"`
 }
