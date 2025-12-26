@@ -29,12 +29,11 @@ import (
 
 // InitRouter Базовая инициализация gin
 func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig) *gin.Engine {
-	// Options
-	router := gin.New()
 	if !baseConfig.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	router := gin.New()
 	prefix := httpConfig.SwaggerPrefix
 
 	if prefix == "" {
