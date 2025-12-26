@@ -46,6 +46,10 @@ go get github.com/exgamer/gosdk-http-core
 
 ---
 
+[Возможности в режиме отладки](DEBUG_MODE.MD)
+
+---
+
 ## 🧠 Концепция HTTP Kernel
 
 HTTP kernel — это kernel приложения, который:
