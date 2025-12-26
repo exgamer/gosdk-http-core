@@ -176,42 +176,5 @@ func FormattedResponse(c *gin.Context) {
 		return
 	}
 
-	//if !appException.TrackInSentry {
-	//	c.Data(appException.Code, "application/json", jsonBytes)
-	//
-	//	return
-	//}
-
-	//sentry.WithScope(func(scope *sentry.Scope) {
-	//	// Добавляем заголовки запроса
-	//	mapHeaders := make(map[string]any)
-	//	for key, values := range c.Request.Header {
-	//		for _, value := range values {
-	//			mapHeaders[fmt.Sprintf("header_%s", key)] = value
-	//		}
-	//	}
-	//	scope.SetContext("header", mapHeaders)
-	//
-	//	// Добавляем Query параметры
-	//	mapQueries := make(map[string]any)
-	//	for key, values := range c.Request.URL.Query() {
-	//		for _, value := range values {
-	//			mapQueries[fmt.Sprintf("query_%s", key)] = value
-	//		}
-	//	}
-	//	scope.SetContext("query", mapQueries)
-	//
-	//	if appException.Code >= 400 && appException.Code < 500 {
-	//		scope.SetLevel(sentry.LevelWarning)
-	//	} else {
-	//		scope.SetLevel(sentry.LevelError)
-	//	}
-	//
-	//	// Захватываем ошибку
-	//	scope.SetContext("error", responseData)
-	//
-	//	sentry.CaptureMessage("Http Status Code  - " + strconv.Itoa(appException.Code) + ". Url - " + c.Request.URL.Path)
-	//})
-
 	c.Data(appException.Code, "application/json", jsonBytes)
 }
