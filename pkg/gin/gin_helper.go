@@ -6,6 +6,7 @@ import (
 	"fmt"
 	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
 	constants2 "github.com/exgamer/gosdk-core/pkg/constants"
+	"github.com/exgamer/gosdk-core/pkg/regex"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
@@ -148,50 +149,6 @@ func GetHttpInfoFromContext(ctx context.Context) *config.HttpInfo {
 	return nil
 }
 
-//func GetContext(c *gin.Context) context.Context {
-//	return context.WithValue(c.Request.Context(), debug.DebugKey, debug.GetDebugCollectorFromGinContext(c))
-//}
-
-//func GetAppInfoFromGinContext(c *gin.Context) *baseConfig.AppInfo {
-//	if dbg, ok := c.Request.Context().Value(constants2.AppInfoKey).(*baseConfig.AppInfo); ok {
-//		return dbg
-//	}
-//
-//	return nil
-//}
-//
-//func GetHttpInfoFromGinContext(c *gin.Context) *config.HttpInfo {
-//	if dbg, ok := c.Request.Context().Value(constants.HttpInfoKey).(*config.HttpInfo); ok {
-//		return dbg
-//	}
-//
-//	return nil
-//}
-
-//func GetAppInfo(c *gin.Context) *baseConfig.AppInfo {
-//	value, exists := c.Get(constants2.AppInfoKey)
-//
-//	if exists {
-//		appInfo := value.(*baseConfig.AppInfo)
-//
-//		return appInfo
-//	}
-//
-//	return GetInstanceAppInfo(nil)
-//}
-//
-//func GetHttpInfo(c *gin.Context) *config.HttpInfo {
-//	value, exists := c.Get(constants.HttpInfoKey)
-//
-//	if exists {
-//		httpInfo := value.(*config.HttpInfo)
-//
-//		return httpInfo
-//	}
-//
-//	return GetInstanceHttpInfo(c)
-//}
-
 // ValidateRequestQuery - Валидация GET параметров HTTP реквеста
 func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
@@ -307,4 +264,20 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 	}
 
 	return true
+}
+
+func GetIntQueryParam(c *gin.Context, name string) (int, error) {
+	checkErr := regex.StringIsPositiveInt(c.Param(name))
+
+	if checkErr != nil {
+		return 0, errors.New("wrong param, must be a positive integer. Max: 2147483647")
+	}
+
+	id, cErr := strconv.Atoi(c.Param(name))
+
+	if cErr != nil {
+		return 0, cErr
+	}
+
+	return id, nil
 }
