@@ -31,7 +31,7 @@ import (
 func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig) *gin.Engine {
 	// Options
 	router := gin.New()
-	if baseConfig.Debug == false {
+	if !baseConfig.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
