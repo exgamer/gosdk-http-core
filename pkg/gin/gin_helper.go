@@ -31,6 +31,10 @@ import (
 func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig) *gin.Engine {
 	// Options
 	router := gin.New()
+	if baseConfig.Debug == false {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	prefix := httpConfig.SwaggerPrefix
 
 	if prefix == "" {
