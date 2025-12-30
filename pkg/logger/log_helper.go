@@ -14,6 +14,7 @@ import (
 // LogAppException лог AppException
 func LogAppException(appException *exception2.HttpException) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	errorLog.Println(appException.Error.Error())
 }
 
 // FormattedInfo Форматированный лог
