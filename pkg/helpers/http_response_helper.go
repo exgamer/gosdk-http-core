@@ -3,7 +3,6 @@ package helpers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/exgamer/gosdk-core/pkg/debug"
 	"github.com/exgamer/gosdk-core/pkg/helpers"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
@@ -66,10 +65,6 @@ func FormattedSuccessResponse(c *gin.Context, data any) {
 
 func FormattedResponse(c *gin.Context) {
 	appExceptionObject, exists := c.Get("exception")
-
-	if appExceptionObject != nil {
-		fmt.Printf("%+v\n", appExceptionObject)
-	}
 
 	if !exists {
 		data, _ := c.Get("data")

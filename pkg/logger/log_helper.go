@@ -14,7 +14,6 @@ import (
 // LogAppException лог AppException
 func LogAppException(appException *exception2.HttpException) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
-	errorLog.Println(appException.Error.Error())
 }
 
 // FormattedInfo Форматированный лог
@@ -39,7 +38,6 @@ func FormattedLog(level string, serviceName string, method string, uri string, s
 	messageBuilder.WriteString("[" + method + "," + uri + "," + strconv.Itoa(status) + "]")
 	messageBuilder.WriteString(" " + message)
 
-	log.Println(messageBuilder.String())
 	log.SetFlags(log.Ldate | log.Ltime)
 }
 
