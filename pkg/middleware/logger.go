@@ -7,7 +7,6 @@ import (
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/exgamer/gosdk-http-core/pkg/logger"
-	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/mitchellh/mapstructure"
 	"io"
@@ -36,17 +35,12 @@ func LoggerMiddleware() gin.HandlerFunc {
 		appInfo := helpers.GetAppInfoFromContext(c.Request.Context())
 		httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context())
 
-		for _, err := range c.Errors {
-			sentry.CaptureException(err)
-			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, c.Writer.Status(), httpInfo.RequestId, err.Error())
-		}
-
 		appExceptionObject, exists := c.Get("exception")
 
 		if exists {
 			appException := exception.HttpException{}
 			mapstructure.Decode(appExceptionObject, &appException)
-			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, c.Writer.Status(), httpInfo.RequestId, appException.Error.Error())
+			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, appException.Code, httpInfo.RequestId, appException.Error.Error())
 
 			return
 		}
