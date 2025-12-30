@@ -42,7 +42,7 @@ func FormattedAppExceptionResponse(c *gin.Context, exception *exception.HttpExce
 
 func AppExceptionResponse(c *gin.Context, exception *exception.HttpException) {
 	c.Set("exception", exception)
-	c.Status(exception.Code)
+	c.AbortWithStatus(exception.Code)
 }
 
 func SuccessResponse(c *gin.Context, data any) {
