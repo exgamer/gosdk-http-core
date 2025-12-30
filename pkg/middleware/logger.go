@@ -38,7 +38,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 		for _, err := range c.Errors {
 			sentry.CaptureException(err)
-			logger.FormattedErrorWithAppInfo(appInfo, httpInfo, err.Error())
+			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, c.Writer.Status(), httpInfo.RequestId, err.Error())
 		}
 
 		appExceptionObject, exists := c.Get("exception")
@@ -46,7 +46,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 		if exists {
 			appException := exception.HttpException{}
 			mapstructure.Decode(appExceptionObject, &appException)
-			logger.FormattedErrorWithAppInfo(appInfo, httpInfo, appException.Error.Error())
+			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, c.Writer.Status(), httpInfo.RequestId, appException.Error.Error())
 
 			return
 		}
