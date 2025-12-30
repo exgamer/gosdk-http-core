@@ -39,6 +39,7 @@ func FormattedLog(level string, serviceName string, method string, uri string, s
 	messageBuilder.WriteString("[" + method + "," + uri + "," + strconv.Itoa(status) + "]")
 	messageBuilder.WriteString(" " + message)
 
+	log.Println(messageBuilder.String())
 	log.SetFlags(log.Ldate | log.Ltime)
 }
 
