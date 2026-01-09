@@ -4,6 +4,7 @@ import (
 	"context"
 	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
 	constants2 "github.com/exgamer/gosdk-core/pkg/constants"
+	"github.com/exgamer/gosdk-core/pkg/logger"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
@@ -21,7 +22,7 @@ import (
 
 // InitRouter Базовая инициализация gin
 func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig) *gin.Engine {
-	if !baseConfig.Debug {
+	if logger.ParseLevel(baseConfig.LogLevel) > logger.LevelDebug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -92,7 +93,7 @@ func GetInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
 	if appConfig != nil {
 		appInfo.AppEnv = appConfig.AppEnv
 		appInfo.ServiceName = appConfig.Name
-		appInfo.DebugMode = appConfig.Debug
+		appInfo.LogLevel = appConfig.LogLevel
 	}
 
 	return appInfo
