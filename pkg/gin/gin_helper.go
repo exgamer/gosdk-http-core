@@ -22,7 +22,7 @@ import (
 
 // InitRouter Базовая инициализация gin
 func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig) *gin.Engine {
-	if logger.ParseLevel(baseConfig.LogLevel) > logger.LevelDebug {
+	if logger.ParseLevel(baseConfig.LogLevel) < logger.LevelDebug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
