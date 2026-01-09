@@ -48,7 +48,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 		messageBuilder := strings.Builder{}
 
-		if logger2.IsDebugLevel(appInfo.LogLevel) {
+		if logger2.IsDebugLevel() {
 			messageBuilder.WriteString("headers: " + headersToJSON(headers) + "; ")
 			messageBuilder.WriteString("query: " + queryToJSON(queryParams) + "; ")
 			messageBuilder.WriteString("request_body: " + bodyToPrettyJSON(requestBody) + "; ")

@@ -3,10 +3,10 @@ package app
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/exgamer/gosdk-core/pkg/app"
 	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
 	"github.com/exgamer/gosdk-core/pkg/di"
+	"github.com/exgamer/gosdk-core/pkg/logger"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	ginHelper "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/exgamer/gosdk-http-core/pkg/metrics"
@@ -38,9 +38,9 @@ func (m *HttpKernel) Init(a *app.App) error {
 			return err
 		}
 
-		spew.Dump(httpConfig) //TODO удалить
-
 		m.HttpConfig = httpConfig
+
+		logger.Dump(httpConfig)
 
 		di.Register(a.Container, m.HttpConfig)
 	}

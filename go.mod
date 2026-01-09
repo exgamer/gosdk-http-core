@@ -3,8 +3,7 @@ module github.com/exgamer/gosdk-http-core
 go 1.23.0
 
 require (
-	github.com/davecgh/go-spew v1.1.1
-	github.com/exgamer/gosdk-core v1.0.6
+	github.com/exgamer/gosdk-core v1.0.8
 	github.com/getsentry/sentry-go v0.24.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-errors/errors v1.4.2
