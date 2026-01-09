@@ -13,7 +13,7 @@ func DebugMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		appInfo := helpers.GetAppInfoFromContext(c.Request.Context())
 
-		if logger.ParseLevel(appInfo.LogLevel) < logger.LevelDebug {
+		if !logger.IsDebugLevel(appInfo.LogLevel) {
 			return
 		}
 
