@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/exgamer/gosdk-core/pkg/helpers"
+	logger2 "github.com/exgamer/gosdk-core/pkg/logger"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/exgamer/gosdk-http-core/pkg/logger"
@@ -47,7 +48,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 		messageBuilder := strings.Builder{}
 
-		if appInfo.DebugMode {
+		if logger2.IsDebugLevel(appInfo.LogLevel) {
 			messageBuilder.WriteString("headers: " + headersToJSON(headers) + "; ")
 			messageBuilder.WriteString("query: " + queryToJSON(queryParams) + "; ")
 			messageBuilder.WriteString("request_body: " + bodyToPrettyJSON(requestBody) + "; ")
