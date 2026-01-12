@@ -1,4 +1,4 @@
-package helpers
+package response
 
 import (
 	"encoding/json"
@@ -18,29 +18,6 @@ const (
 	ctxKeyData       = "data"
 	ctxKeyStatusCode = "status_code"
 )
-
-func FormattedTextErrorResponse(c *gin.Context, statusCode int, message string, context map[string]any) {
-	TextErrorResponse(c, statusCode, message, context)
-	FormattedResponse(c)
-}
-
-func TextErrorResponse(c *gin.Context, statusCode int, message string, context map[string]any) {
-	ErrorResponse(c, exception.NewHttpException(statusCode, errors.New(message), context))
-}
-
-func FormattedErrorResponse(c *gin.Context, statusCode int, err error, context map[string]any) {
-	ErrorResponse(c, exception.NewHttpException(statusCode, err, context))
-	FormattedResponse(c)
-}
-
-func ErrorResponseUntrackableSentry(c *gin.Context, statusCode int, err error, context map[string]any) {
-	ErrorResponse(c, exception.NewUntrackableAppException(statusCode, err, context))
-}
-
-func FormattedAppExceptionResponse(c *gin.Context, ex *exception.HttpException) {
-	ErrorResponse(c, ex)
-	FormattedResponse(c)
-}
 
 func ErrorResponse(c *gin.Context, err error) {
 	c.Set(ctxKeyException, err)
@@ -78,58 +55,58 @@ func ErrorResponseWithStatus(c *gin.Context, statusCode int, err error, context 
 
 // ---------- базовые (error) ----------
 
-func BadRequestResponse(c *gin.Context, err error, ctx map[string]any) {
+func BadRequest(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusBadRequest, err, ctx)
 }
 
-func UnauthorizedResponse(c *gin.Context, err error, ctx map[string]any) {
+func Unauthorized(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusUnauthorized, err, ctx)
 }
 
-func ForbiddenResponse(c *gin.Context, err error, ctx map[string]any) {
+func Forbidden(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusForbidden, err, ctx)
 }
 
-func NotFoundResponse(c *gin.Context, err error, ctx map[string]any) {
+func NotFound(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusNotFound, err, ctx)
 }
 
-func ConflictResponse(c *gin.Context, err error, ctx map[string]any) {
+func Conflict(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusConflict, err, ctx)
 }
 
-func UnprocessableEntityResponse(c *gin.Context, err error, ctx map[string]any) {
+func UnprocessableEntity(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusUnprocessableEntity, err, ctx)
 }
 
-func TooManyRequestsResponse(c *gin.Context, err error, ctx map[string]any) {
+func TooManyRequests(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusTooManyRequests, err, ctx)
 }
 
-func InternalServerErrorResponse(c *gin.Context, err error, ctx map[string]any) {
+func InternalServerError(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusInternalServerError, err, ctx)
 }
 
-func SuccessResponse(c *gin.Context, data any) {
+func Success(c *gin.Context, data any) {
 	c.Set(ctxKeyData, data)
 }
 
-func SuccessCreatedResponse(c *gin.Context, data any) {
+func SuccessCreated(c *gin.Context, data any) {
 	c.Set(ctxKeyData, data)
 	c.Set(ctxKeyStatusCode, http.StatusCreated)
 }
 
-func SuccessDeletedResponse(c *gin.Context, data any) {
+func SuccessDeleted(c *gin.Context, data any) {
 	c.Set(ctxKeyData, data)
 	c.Set(ctxKeyStatusCode, http.StatusNoContent)
 }
 
 func FormattedSuccessResponse(c *gin.Context, data any) {
-	SuccessResponse(c, data)
-	FormattedResponse(c)
+	Success(c, data)
+	Formatted(c)
 }
 
-func FormattedResponse(c *gin.Context) {
+func Formatted(c *gin.Context) {
 	// ---- ERROR PATH ----
 	if exObj, exists := c.Get(ctxKeyException); exists {
 		err, ok := exObj.(error)

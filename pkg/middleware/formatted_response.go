@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/exgamer/gosdk-http-core/pkg/helpers"
+	"github.com/exgamer/gosdk-http-core/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,6 +10,6 @@ func FormattedResponseMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
-		helpers.FormattedResponse(c)
+		response.Formatted(c)
 	}
 }

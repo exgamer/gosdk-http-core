@@ -12,9 +12,9 @@
 ## Успех
 
 ```go
-helpers.SuccessResponse(c, data)          // 200
-helpers.SuccessCreatedResponse(c, data)   // 201
-helpers.SuccessDeletedResponse(c, nil)    // 204
+response.Success(c, data)          // 200
+response.SuccessCreated(c, data)   // 201
+response.SuccessDeletedR(c, nil)    // 204
 ```
 
 ---
@@ -24,7 +24,7 @@ helpers.SuccessDeletedResponse(c, nil)    // 204
 Базовый вариант (принимает error):
 
 ```go
-helpers.ErrorResponse(c, err)
+response.Error(c, err)
 ```
 
 Если err AppException (пакет gosdk-core) → станет 500 Internal Server Error и будет учтен context и error
@@ -38,18 +38,11 @@ helpers.ErrorResponseWithStatus(c, http.StatusBadRequest, err, ctx)
 Готовые шорткаты:
 
 ```go
-helpers.BadRequest(c, err, ctx)
-helpers.NotFound(c, err, ctx)
-helpers.InternalServerError(c, err, ctx)
-helpers.Unauthorized(c, err, ctx)
-helpers.Forbidden(c, err, ctx)
-```
-
-Текстовые:
-
-```go
-helpers.BadRequestMsg(c, "invalid id", nil)
-helpers.NotFoundMsg(c, "not found", nil)
+response.BadRequest(c, err, ctx)
+response.NotFound(c, err, ctx)
+response.InternalServerError(c, err, ctx)
+response.Unauthorized(c, err, ctx)
+response.Forbidden(c, err, ctx)
 ```
 
 ---
@@ -61,23 +54,23 @@ func (h *CityHandler) View() gin.HandlerFunc {
     return func(c *gin.Context) {
         id, err := validators.GetIntQueryParam(c, "id")
         if err != nil {
-            helpers.BadRequest(c, err, nil)
+        response.BadRequest(c, err, nil)
             return
         }
 
         item, err := h.cityService.GetById(c.Request.Context(), uint(id))
         if err != nil {
-            helpers.InternalServerError(c, err, nil)
+        response.InternalServerError(c, err, nil)
             return
         }
 
         if item == nil {
-            helpers.NotFoundResponse(c, errors.New("Not Found"), nil)
+        response.NotFoundResponse(c, errors.New("Not Found"), nil)
 
             return
         }
 
-        helpers.SuccessResponse(c, factories.OneResponse(item))
+        response.SuccessResponse(c, factories.OneResponse(item))
     }
 }
 ```
@@ -92,7 +85,7 @@ func (h *CityHandler) View() gin.HandlerFunc {
 func ResponseMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
         c.Next()
-        helpers.FormattedResponse(c)
+		response.Formatted(c)
     }
 }
 ```

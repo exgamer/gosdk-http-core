@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/exgamer/gosdk-core/pkg/regex"
 	"github.com/exgamer/gosdk-http-core/pkg/gin/validation"
-	"github.com/exgamer/gosdk-http-core/pkg/helpers"
+	"github.com/exgamer/gosdk-http-core/pkg/response"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -39,7 +39,7 @@ func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 				out[strcase.ToSnake(fe.Field())] = msg
 			}
 
-			helpers.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
 
 			return false
 		}
@@ -50,7 +50,7 @@ func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 		if errors.As(err, &unmarshalTypeError) {
 			out := make(map[string]any)
 			out[strcase.ToSnake(unmarshalTypeError.Field)] = fmt.Sprintf("Invalid type expected %s but got %s", unmarshalTypeError.Type, unmarshalTypeError.Value)
-			helpers.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
 
 			return false
 		}
@@ -61,12 +61,12 @@ func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 		if errors.As(err, &parseNumTypeError) {
 			out := make(map[string]any)
 			out[strcase.ToSnake(parseNumTypeError.Num)] = parseNumTypeError.Error()
-			helpers.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, parseNumTypeError, out)
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, parseNumTypeError, out)
 
 			return false
 		}
 
-		helpers.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("incorrect request body"), nil)
+		response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("incorrect request body"), nil)
 
 		return false
 	}
@@ -98,7 +98,7 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 				out[strcase.ToSnake(fe.Field())] = msg
 			}
 
-			helpers.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
 
 			return false
 		}
@@ -110,7 +110,7 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 			out := make(map[string]any)
 			out[strcase.ToSnake(unmarshalTypeError.Field)] = fmt.Sprintf("Invalid type expected %s but got %s", unmarshalTypeError.Type, unmarshalTypeError.Value)
 
-			helpers.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
 
 			return false
 		}
@@ -119,12 +119,12 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 		var syntaxTypeError *json.SyntaxError
 
 		if errors.As(err, &syntaxTypeError) {
-			helpers.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("incorrect request body"), nil)
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("incorrect request body"), nil)
 
 			return false
 		}
 
-		helpers.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("incorrect request body"), nil)
+		response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("incorrect request body"), nil)
 
 		return false
 	}
