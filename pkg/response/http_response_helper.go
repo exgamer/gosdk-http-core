@@ -19,6 +19,10 @@ const (
 	ctxKeyStatusCode = "status_code"
 )
 
+func ErrorResponseUntrackableSentry(c *gin.Context, statusCode int, err error, context map[string]any) {
+	ErrorResponse(c, exception.NewUntrackableAppException(statusCode, err, context))
+}
+
 func ErrorResponse(c *gin.Context, err error) {
 	c.Set(ctxKeyException, err)
 
