@@ -3,6 +3,7 @@ package helpers
 import (
 	"encoding/json"
 	"errors"
+	exception2 "github.com/exgamer/gosdk-core/pkg/exception"
 	"net/http"
 
 	"github.com/exgamer/gosdk-core/pkg/debug"
@@ -50,6 +51,63 @@ func ErrorResponse(c *gin.Context, err error) {
 	}
 
 	c.AbortWithStatus(httpEx.Code)
+}
+
+func ErrorResponseWithStatus(c *gin.Context, statusCode int, err error, context map[string]any) {
+	// 1. Если это уже HttpException → используем как есть
+	var httpEx *exception.HttpException
+	if errors.As(err, &httpEx) {
+		ErrorResponse(c, err)
+
+		return
+	}
+
+	// 2. Если это AppException → превращаем в HttpException, сохранив поля
+	var appEx *exception2.AppException
+	if errors.As(err, &appEx) {
+		httpErr := exception.NewHttpException(statusCode, appEx.Err, appEx.Context)
+		httpErr.TrackInSentry = appEx.TrackInSentry
+		ErrorResponse(c, httpErr)
+
+		return
+	}
+
+	// 3. Обычная ошибка → оборачиваем стандартно
+	ErrorResponse(c, exception.NewHttpException(statusCode, err, context))
+}
+
+// ---------- базовые (error) ----------
+
+func BadRequestResponse(c *gin.Context, err error, ctx map[string]any) {
+	ErrorResponseWithStatus(c, http.StatusBadRequest, err, ctx)
+}
+
+func UnauthorizedResponse(c *gin.Context, err error, ctx map[string]any) {
+	ErrorResponseWithStatus(c, http.StatusUnauthorized, err, ctx)
+}
+
+func ForbiddenResponse(c *gin.Context, err error, ctx map[string]any) {
+	ErrorResponseWithStatus(c, http.StatusForbidden, err, ctx)
+}
+
+func NotFoundResponse(c *gin.Context, err error, ctx map[string]any) {
+	ErrorResponseWithStatus(c, http.StatusNotFound, err, ctx)
+}
+
+func ConflictResponse(c *gin.Context, err error, ctx map[string]any) {
+	ErrorResponseWithStatus(c, http.StatusConflict, err, ctx)
+}
+
+func UnprocessableEntityResponse(c *gin.Context, err error, ctx map[string]any) {
+	ErrorResponseWithStatus(c, http.StatusUnprocessableEntity, err, ctx)
+}
+
+func TooManyRequestsResponse(c *gin.Context, err error, ctx map[string]any) {
+	ErrorResponseWithStatus(c, http.StatusTooManyRequests, err, ctx)
+}
+
+func InternalServerErrorResponse(c *gin.Context, err error, ctx map[string]any) {
+	ErrorResponseWithStatus(c, http.StatusInternalServerError, err, ctx)
 }
 
 func SuccessResponse(c *gin.Context, data any) {
