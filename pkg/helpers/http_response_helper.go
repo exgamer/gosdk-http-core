@@ -3,13 +3,19 @@ package helpers
 import (
 	"encoding/json"
 	"errors"
+	"net/http"
+
 	"github.com/exgamer/gosdk-core/pkg/debug"
-	"github.com/exgamer/gosdk-core/pkg/helpers"
+	corehelpers "github.com/exgamer/gosdk-core/pkg/helpers"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/gin-gonic/gin"
-	"github.com/mitchellh/mapstructure"
-	"net/http"
+)
+
+const (
+	ctxKeyException  = "exception"
+	ctxKeyData       = "data"
+	ctxKeyStatusCode = "status_code"
 )
 
 func FormattedTextErrorResponse(c *gin.Context, statusCode int, message string, context map[string]any) {
@@ -18,44 +24,46 @@ func FormattedTextErrorResponse(c *gin.Context, statusCode int, message string, 
 }
 
 func TextErrorResponse(c *gin.Context, statusCode int, message string, context map[string]any) {
-	AppExceptionResponse(c, exception.NewHttpException(statusCode, errors.New(message), context))
+	ErrorResponse(c, exception.NewHttpException(statusCode, errors.New(message), context))
 }
 
 func FormattedErrorResponse(c *gin.Context, statusCode int, err error, context map[string]any) {
-	ErrorResponse(c, statusCode, err, context)
+	ErrorResponse(c, exception.NewHttpException(statusCode, err, context))
 	FormattedResponse(c)
-}
-
-func ErrorResponse(c *gin.Context, statusCode int, err error, context map[string]any) {
-	AppExceptionResponse(c, exception.NewHttpException(statusCode, err, context))
 }
 
 func ErrorResponseUntrackableSentry(c *gin.Context, statusCode int, err error, context map[string]any) {
-	AppExceptionResponse(c, exception.NewUntrackableAppException(statusCode, err, context))
+	ErrorResponse(c, exception.NewUntrackableAppException(statusCode, err, context))
 }
 
-func FormattedAppExceptionResponse(c *gin.Context, exception *exception.HttpException) {
-	AppExceptionResponse(c, exception)
+func FormattedAppExceptionResponse(c *gin.Context, ex *exception.HttpException) {
+	ErrorResponse(c, ex)
 	FormattedResponse(c)
 }
 
-func AppExceptionResponse(c *gin.Context, exception *exception.HttpException) {
-	c.Set("exception", exception)
-	c.AbortWithStatus(exception.Code)
+func ErrorResponse(c *gin.Context, err error) {
+	c.Set(ctxKeyException, err)
+
+	var httpEx *exception.HttpException
+	if !errors.As(err, &httpEx) {
+		httpEx = exception.NewInternalServerErrorException(err, nil)
+	}
+
+	c.AbortWithStatus(httpEx.Code)
 }
 
 func SuccessResponse(c *gin.Context, data any) {
-	c.Set("data", data)
+	c.Set(ctxKeyData, data)
 }
 
 func SuccessCreatedResponse(c *gin.Context, data any) {
-	c.Set("data", data)
-	c.Set("status_code", http.StatusCreated)
+	c.Set(ctxKeyData, data)
+	c.Set(ctxKeyStatusCode, http.StatusCreated)
 }
 
 func SuccessDeletedResponse(c *gin.Context, data any) {
-	c.Set("data", data)
-	c.Set("status_code", http.StatusNoContent)
+	c.Set(ctxKeyData, data)
+	c.Set(ctxKeyStatusCode, http.StatusNoContent)
 }
 
 func FormattedSuccessResponse(c *gin.Context, data any) {
@@ -64,108 +72,84 @@ func FormattedSuccessResponse(c *gin.Context, data any) {
 }
 
 func FormattedResponse(c *gin.Context) {
-	appExceptionObject, exists := c.Get("exception")
-
-	if !exists {
-		data, _ := c.Get("data")
-		var response interface{}
-
-		if dbg := debug.GetDebugFromContext(c.Request.Context()); dbg != nil {
-			dbg.CalculateTotalTime()
-			response = struct {
-				Success bool        `json:"success"`
-				Data    interface{} `json:"data"`
-				Debug   interface{} `json:"debug"`
-			}{
-				true,
-				data,
-				dbg,
-			}
-		} else {
-			response = struct {
-				Success bool        `json:"success"`
-				Data    interface{} `json:"data"`
-			}{
-				true,
-				data,
-			}
+	// ---- ERROR PATH ----
+	if exObj, exists := c.Get(ctxKeyException); exists {
+		err, ok := exObj.(error)
+		if !ok {
+			err = errors.New("exception in context is not error")
 		}
 
-		jsonBytes, err := json.Marshal(response)
-
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to marshal JSON"})
-
-			return
+		var httpEx *exception.HttpException
+		if !errors.As(err, &httpEx) {
+			httpEx = exception.NewInternalServerErrorException(err, nil)
 		}
 
-		c.Writer.Status()
-		statusCode, ex := c.Get("status_code")
+		serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
+		requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
 
-		if !ex {
-			c.Data(http.StatusOK, "application/json", jsonBytes)
-		} else {
-			c.Data(statusCode.(int), "application/json", jsonBytes)
+		if appInfo := corehelpers.GetAppInfoFromContext(c.Request.Context()); appInfo != nil {
+			serviceName = appInfo.ServiceName
 		}
+
+		if httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context()); httpInfo != nil {
+			requestId = httpInfo.RequestId
+		}
+
+		responseData := gin.H{
+			"status":     httpEx.Code,
+			"error":      httpEx.GetErrorType(),
+			"message":    httpEx.Error(),
+			"request_id": requestId,
+			"hostname":   serviceName,
+			"details":    httpEx.Context,
+		}
+
+		writeJSON(c, httpEx.Code, wrapWithDebug(c, false, responseData))
 
 		return
 	}
 
-	appException := exception.HttpException{}
-	mapstructure.Decode(appExceptionObject, &appException)
-	serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
-	requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
-	appInfo := helpers.GetAppInfoFromContext(c.Request.Context())
+	// ---- SUCCESS PATH ----
+	data, _ := c.Get(ctxKeyData)
 
-	if appInfo != nil {
-		serviceName = appInfo.ServiceName
+	status := http.StatusOK
+	if v, ok := c.Get(ctxKeyStatusCode); ok {
+		if sc, ok := v.(int); ok && sc > 0 {
+			status = sc
+		}
 	}
 
-	httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context())
+	writeJSON(c, status, wrapWithDebug(c, true, data))
+}
 
-	if exists {
-		requestId = httpInfo.RequestId
-	}
-
-	responseData := gin.H{
-		"status":     appException.Code,
-		"error":      appException.GetErrorType(),
-		"message":    appException.Error.Error(),
-		"request_id": requestId,
-		"hostname":   serviceName,
-		"details":    appException.Context,
-	}
-
-	var response interface{}
-
+func wrapWithDebug(c *gin.Context, success bool, data any) any {
 	if dbg := debug.GetDebugFromContext(c.Request.Context()); dbg != nil {
 		dbg.CalculateTotalTime()
-		response = struct {
-			Success bool        `json:"success"`
-			Data    interface{} `json:"data"`
-			Debug   interface{} `json:"debug"`
+		return struct {
+			Success bool `json:"success"`
+			Data    any  `json:"data"`
+			Debug   any  `json:"debug"`
 		}{
-			false,
-			responseData,
-			dbg,
-		}
-	} else {
-		response = struct {
-			Success bool        `json:"success"`
-			Data    interface{} `json:"data"`
-		}{
-			false,
-			responseData,
+			Success: success,
+			Data:    data,
+			Debug:   dbg,
 		}
 	}
 
-	jsonBytes, err := json.Marshal(response)
+	return struct {
+		Success bool `json:"success"`
+		Data    any  `json:"data"`
+	}{
+		Success: success,
+		Data:    data,
+	}
+}
 
+func writeJSON(c *gin.Context, status int, payload any) {
+	b, err := json.Marshal(payload)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to marshal JSON"})
-
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "failed to marshal JSON"})
 		return
 	}
-
-	c.Data(appException.Code, "application/json", jsonBytes)
+	c.Data(status, "application/json", b)
 }

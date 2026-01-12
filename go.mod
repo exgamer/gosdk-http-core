@@ -3,7 +3,7 @@ module github.com/exgamer/gosdk-http-core
 go 1.23.0
 
 require (
-	github.com/exgamer/gosdk-core v1.0.8
+	github.com/exgamer/gosdk-core v1.0.9
 	github.com/getsentry/sentry-go v0.24.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-errors/errors v1.4.2
@@ -11,7 +11,6 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gookit/validate v1.5.2
 	github.com/iancoleman/strcase v0.3.0
-	github.com/mitchellh/mapstructure v1.5.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
@@ -49,6 +48,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect

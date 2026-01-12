@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"errors"
 	"fmt"
+
 	config2 "github.com/exgamer/gosdk-core/pkg/config"
 	"github.com/exgamer/gosdk-core/pkg/constants"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
@@ -9,7 +11,6 @@ import (
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
-	"github.com/mitchellh/mapstructure"
 )
 
 // SentryMiddleware Middleware для обработки ошибок в sentry
@@ -17,66 +18,99 @@ func SentryMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 
-		appExceptionObject, exists := c.Get("exception")
+		exObj, exists := c.Get("exception")
 		if !exists {
 			return
 		}
 
-		appException := exception.HttpException{}
-		mapstructure.Decode(appExceptionObject, &appException)
-		serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
-		requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
-		value, exists := c.Get(constants.AppInfoKey)
-		if exists {
-			appInfo := value.(*config2.AppInfo)
-			serviceName = appInfo.ServiceName
+		// Вытаскиваем error
+		err, ok := exObj.(error)
+		if !ok {
+			err = fmt.Errorf("exception in context is not error: %T", exObj)
 		}
 
-		value, exists = c.Get(constants2.HttpInfoKey)
+		// Пытаемся привести к HttpException
+		var httpEx *exception.HttpException
+		if !errors.As(err, &httpEx) {
+			httpEx = exception.NewInternalServerErrorException(err, nil)
+		}
 
-		if exists {
-			httpInfo := value.(*config.HttpInfo)
-			requestId = httpInfo.RequestId
+		// Уважаем флаг TrackInSentry
+		if !httpEx.TrackInSentry {
+			return
+		}
+
+		serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
+		requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
+
+		if v, ok := c.Get(constants.AppInfoKey); ok {
+			if appInfo, ok := v.(*config2.AppInfo); ok && appInfo != nil {
+				serviceName = appInfo.ServiceName
+			}
+		}
+
+		if v, ok := c.Get(constants2.HttpInfoKey); ok {
+			if httpInfo, ok := v.(*config.HttpInfo); ok && httpInfo != nil {
+				requestId = httpInfo.RequestId
+			}
+		}
+
+		// То, что реально ушло клиенту
+		status := c.Writer.Status()
+		if status == 0 {
+			status = httpEx.Code
 		}
 
 		responseData := gin.H{
-			"status":     appException.Code,
-			"error":      appException.GetErrorType(),
-			"message":    appException.Error.Error(),
+			"status":     status,
+			"error":      httpEx.GetErrorType(),
+			"message":    httpEx.Error(),
 			"request_id": requestId,
 			"hostname":   serviceName,
-			"details":    appException.Context,
+			"details":    httpEx.Context,
 		}
 
 		sentry.WithScope(func(scope *sentry.Scope) {
-			// Добавляем заголовки запроса
-			mapHeaders := make(map[string]any)
+			// Заголовки — лучше санитайзить (минимум: Authorization/Cookie) TODO расиширить
+			mapHeaders := make(map[string]any, len(c.Request.Header))
 			for key, values := range c.Request.Header {
-				for _, value := range values {
-					mapHeaders[fmt.Sprintf("header_%s", key)] = value
+				if key == "Authorization" || key == "Cookie" {
+					mapHeaders[fmt.Sprintf("header_%s", key)] = "*****"
+
+					continue
+				}
+
+				if len(values) > 0 {
+					mapHeaders[fmt.Sprintf("header_%s", key)] = values[0]
 				}
 			}
 			scope.SetContext("header", mapHeaders)
 
-			// Добавляем Query параметры
+			// Query параметры — тоже осторожно с token/secret TODO расиширить
 			mapQueries := make(map[string]any)
 			for key, values := range c.Request.URL.Query() {
-				for _, value := range values {
-					mapQueries[fmt.Sprintf("query_%s", key)] = value
+				if key == "token" || key == "access_token" {
+					mapQueries[fmt.Sprintf("query_%s", key)] = "*****"
+
+					continue
+				}
+				if len(values) > 0 {
+					mapQueries[fmt.Sprintf("query_%s", key)] = values[0]
 				}
 			}
+
 			scope.SetContext("query", mapQueries)
 
-			if appException.Code >= 400 && appException.Code < 500 {
+			if httpEx.Code >= 400 && httpEx.Code < 500 {
 				scope.SetLevel(sentry.LevelWarning)
 			} else {
 				scope.SetLevel(sentry.LevelError)
 			}
 
-			// Захватываем ошибку
 			scope.SetContext("error", responseData)
 
-			sentry.CaptureException(appException.Error)
+			// В Sentry отправляем исходную ошибку
+			sentry.CaptureException(err)
 		})
 	}
 }

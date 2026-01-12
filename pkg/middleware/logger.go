@@ -3,13 +3,14 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/exgamer/gosdk-core/pkg/helpers"
 	logger2 "github.com/exgamer/gosdk-core/pkg/logger"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/exgamer/gosdk-http-core/pkg/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/mitchellh/mapstructure"
 	"io"
 	"net/http"
 	"net/url"
@@ -20,43 +21,66 @@ import (
 // LoggerMiddleware Middleware для логирования ответа и отправки ошибок в сентри
 func LoggerMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		startTime := time.Now()
+		start := time.Now()
+
 		req := c.Request
 		headers := sanitizeHeaders(req.Header)
 		queryParams := req.URL.Query()
+
 		var requestBody []byte
 		if req.Body != nil {
-			requestBody, _ = io.ReadAll(req.Body)
+			requestBody, _ = io.ReadAll(io.LimitReader(req.Body, 1<<20))
 			req.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 		}
 
 		c.Next()
-		endTime := time.Now()
-		latency := endTime.Sub(startTime)
+
+		latency := time.Since(start)
 		appInfo := helpers.GetAppInfoFromContext(c.Request.Context())
 		httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context())
+		status := c.Writer.Status()
 
-		appExceptionObject, exists := c.Get("exception")
+		// 1) если выставили exception
+		if exObj, exists := c.Get("exception"); exists {
+			var err error
+			if e, ok := exObj.(error); ok {
+				err = e
+			} else {
+				err = fmt.Errorf("exception in context is not error: %T", exObj)
+			}
 
-		if exists {
-			appException := exception.HttpException{}
-			mapstructure.Decode(appExceptionObject, &appException)
-			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, appException.Code, httpInfo.RequestId, appException.Error.Error())
+			var httpEx *exception.HttpException
+			if !errors.As(err, &httpEx) {
+				httpEx = exception.NewInternalServerErrorException(err, nil)
+			}
+
+			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, httpEx.Error())
 
 			return
 		}
 
-		messageBuilder := strings.Builder{}
+		// 2) если gin накопил ошибки (например c.Error(err)), тоже считаем это error-log
+		if len(c.Errors) > 0 || status >= 500 {
+			msg := c.Errors.String()
+			if msg == "" {
+				msg = "server error"
+			}
 
+			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, msg)
+
+			return
+		}
+
+		// info log
+		messageBuilder := strings.Builder{}
 		if logger2.IsDebugLevel() {
 			messageBuilder.WriteString("headers: " + headersToJSON(headers) + "; ")
 			messageBuilder.WriteString("query: " + queryToJSON(queryParams) + "; ")
 			messageBuilder.WriteString("request_body: " + bodyToPrettyJSON(requestBody) + "; ")
 		}
-
 		messageBuilder.WriteString("Exec time:" + latency.String())
 
-		logger.FormattedInfo(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, c.Writer.Status(), httpInfo.RequestId, messageBuilder.String())
+		logger.FormattedInfo(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, messageBuilder.String())
 	}
 }
 

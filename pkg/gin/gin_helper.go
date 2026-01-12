@@ -7,7 +7,6 @@ import (
 	"github.com/exgamer/gosdk-core/pkg/logger"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
-	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
@@ -68,22 +67,13 @@ func ErrorHandler(c *gin.Context, err any) {
 	c.JSON(http.StatusInternalServerError, gin.H{"message": goErr.Error(), "details": details, "success": false, "service_code": 0})
 }
 
-func Error(c *gin.Context, exception *exception.HttpException) {
-	c.Set("exception", exception)
-	c.Status(exception.Code)
-}
-
-func Success(c *gin.Context, data any) {
-	c.Set("data", data)
-}
-
-func SetAppInfo(c *gin.Context, baseConfig *baseConfig.BaseConfig) {
-	c.Set(constants2.AppInfoKey, GetInstanceAppInfo(baseConfig))
-}
-
-func SetHttpInfo(c *gin.Context) {
-	c.Set(constants.HttpInfoKey, GetInstanceHttpInfo(c))
-}
+//func SetAppInfo(c *gin.Context, baseConfig *baseConfig.BaseConfig) {
+//	c.Set(constants2.AppInfoKey, GetInstanceAppInfo(baseConfig))
+//}
+//
+//func SetHttpInfo(c *gin.Context) {
+//	c.Set(constants.HttpInfoKey, GetInstanceHttpInfo(c))
+//}
 
 func GetInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
 	appInfo := &baseConfig.AppInfo{}
