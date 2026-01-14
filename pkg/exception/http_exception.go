@@ -2,8 +2,8 @@ package exception
 
 import (
 	"errors"
-	"github.com/exgamer/gosdk-core/pkg/validation"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
+	"github.com/exgamer/gosdk-http-core/pkg/validators"
 	"github.com/gookit/validate"
 	"net/http"
 )
@@ -59,5 +59,5 @@ func NewUntrackableAppException(code int, err error, context map[string]any) *Ht
 }
 
 func NewValidationAppExceptionFromValidationErrors(validationErrors validate.Errors) *HttpException {
-	return NewValidationAppException(validation.ValidationErrorsAsMap(validationErrors))
+	return NewValidationAppException(validators.ValidationErrorsAsMap(validationErrors))
 }
