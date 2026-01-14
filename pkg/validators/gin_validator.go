@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/gookit/validate"
 	"github.com/iancoleman/strcase"
 	"net/http"
 	"strconv"
@@ -147,17 +146,6 @@ func GetIntQueryParam(c *gin.Context, name string) (int, error) {
 	}
 
 	return id, nil
-}
-
-// ValidationErrorsAsMap -возвращает ошибки валидации как map
-func ValidationErrorsAsMap(validationErrors validate.Errors) map[string]any {
-	eMap := make(map[string]any, len(validationErrors))
-
-	for k, ve := range validationErrors {
-		eMap[k] = ve.String()
-	}
-
-	return eMap
 }
 
 // BindANdValidateStruct - биндит в структуру массив битов и валидирует

@@ -20,7 +20,7 @@ const (
 )
 
 func ErrorResponseUntrackableSentry(c *gin.Context, statusCode int, err error, context map[string]any) {
-	ErrorResponse(c, exception.NewUntrackableAppException(statusCode, err, context))
+	ErrorResponse(c, exception.NewUntrackableHttpException(statusCode, err, context))
 }
 
 func ErrorResponse(c *gin.Context, err error) {

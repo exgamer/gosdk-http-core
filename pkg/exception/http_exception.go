@@ -3,7 +3,6 @@ package exception
 import (
 	"errors"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
-	"github.com/exgamer/gosdk-http-core/pkg/validators"
 	"github.com/gookit/validate"
 	"net/http"
 )
@@ -43,7 +42,7 @@ func NewInternalServerErrorException(err error, context map[string]any) *HttpExc
 	return NewHttpException(http.StatusInternalServerError, err, context)
 }
 
-func NewValidationAppException(context map[string]any) *HttpException {
+func NewValidationHttpException(context map[string]any) *HttpException {
 	return NewHttpException(
 		http.StatusUnprocessableEntity,
 		errors.New("VALIDATION ERROR"),
@@ -51,7 +50,7 @@ func NewValidationAppException(context map[string]any) *HttpException {
 	)
 }
 
-func NewUntrackableAppException(code int, err error, context map[string]any) *HttpException {
+func NewUntrackableHttpException(code int, err error, context map[string]any) *HttpException {
 	ex := NewHttpException(code, err, context)
 	ex.TrackInSentry = false
 
@@ -59,5 +58,16 @@ func NewUntrackableAppException(code int, err error, context map[string]any) *Ht
 }
 
 func NewValidationAppExceptionFromValidationErrors(validationErrors validate.Errors) *HttpException {
-	return NewValidationAppException(validators.ValidationErrorsAsMap(validationErrors))
+	return NewValidationHttpException(ValidationErrorsAsMap(validationErrors))
+}
+
+// ValidationErrorsAsMap -возвращает ошибки валидации как map
+func ValidationErrorsAsMap(validationErrors validate.Errors) map[string]any {
+	eMap := make(map[string]any, len(validationErrors))
+
+	for k, ve := range validationErrors {
+		eMap[k] = ve.String()
+	}
+
+	return eMap
 }
