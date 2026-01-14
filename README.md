@@ -27,7 +27,7 @@ go get github.com/exgamer/gosdk-http-core
 
 ---
 
-[Что доступно в DI из коробки](pkg/app/DI_FUNCTIONS_README.MD)
+[Что доступно в DI из коробки](pkg/di/DI_FUNCTIONS_README.MD)
 
 ---
 
@@ -89,7 +89,7 @@ SENTRY_DSN=
 Роутер (Gin) регистрируется в DI и доступен в бизнес-модулях.
 
 ```go
-router, err := app.GetRouter(app)
+router, err := di.GetRouter(app)
 if err != nil {
     return err
 }

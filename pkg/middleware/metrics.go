@@ -2,12 +2,11 @@ package middleware
 
 import (
 	"errors"
-	"time"
-
 	"github.com/exgamer/gosdk-core/pkg/app"
-	app2 "github.com/exgamer/gosdk-http-core/pkg/app"
+	"github.com/exgamer/gosdk-http-core/pkg/di"
 	exception2 "github.com/exgamer/gosdk-http-core/pkg/exception"
 	"github.com/gin-gonic/gin"
+	"time"
 )
 
 // MetricsMiddleware - мидлвар для обработки HTTP запросов метрик
@@ -16,7 +15,7 @@ func MetricsMiddleware(a *app.App) gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 
-		metricsCollector, err := app2.GetMetricsCollector(a)
+		metricsCollector, err := di.GetMetricsCollector(a.Container)
 		if err != nil || metricsCollector == nil {
 			return
 		}

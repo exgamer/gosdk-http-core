@@ -59,7 +59,7 @@ func (m *HttpKernel) Init(a *app.App) error {
 
 	di.Register(a.Container, m.Router)
 
-	appConfig, err := app.GetBaseConfig(a)
+	appConfig, err := di.GetBaseConfig(a.Container)
 
 	if err != nil {
 		return err
