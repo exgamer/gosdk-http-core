@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/exgamer/gosdk-core/pkg/app"
 	constants2 "github.com/exgamer/gosdk-core/pkg/constants"
+	"github.com/exgamer/gosdk-core/pkg/di"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/gin-gonic/gin"
@@ -12,7 +13,7 @@ import (
 // RequestInfoMiddleware Middleware заполняющий данные запроса
 func RequestInfoMiddleware(a *app.App) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		baseConfig, err := app.GetBaseConfig(a)
+		baseConfig, err := di.GetBaseConfig(a.Container)
 
 		if err != nil {
 			return
