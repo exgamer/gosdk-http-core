@@ -26,6 +26,7 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 	}
 
 	router := gin.New()
+
 	prefix := httpConfig.SwaggerPrefix
 
 	if prefix == "" {
@@ -75,19 +76,19 @@ func ErrorHandler(c *gin.Context, err any) {
 //	c.Set(constants.HttpInfoKey, GetInstanceHttpInfo(c))
 //}
 
-func GetInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
-	appInfo := &baseConfig.AppInfo{}
-	appInfo.AppEnv = "UNKNOWN (maybe you not used RequestMiddleware)"
-	appInfo.ServiceName = "UNKNOWN (maybe you not used RequestMiddleware)"
-
-	if appConfig != nil {
-		appInfo.AppEnv = appConfig.AppEnv
-		appInfo.ServiceName = appConfig.Name
-		appInfo.LogLevel = appConfig.LogLevel
-	}
-
-	return appInfo
-}
+//func GetInstanceAppInfo(appConfig *baseConfig.BaseConfig) *baseConfig.AppInfo {
+//	appInfo := &baseConfig.AppInfo{}
+//	appInfo.AppEnv = "UNKNOWN (maybe you not used RequestMiddleware)"
+//	appInfo.ServiceName = "UNKNOWN (maybe you not used RequestMiddleware)"
+//
+//	if appConfig != nil {
+//		appInfo.AppEnv = appConfig.AppEnv
+//		appInfo.ServiceName = appConfig.Name
+//		appInfo.LogLevel = appConfig.LogLevel
+//	}
+//
+//	return appInfo
+//}
 
 func GetInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
 	httpInfo := &config.HttpInfo{}
@@ -113,14 +114,14 @@ func GetInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
 	return httpInfo
 }
 
-func GetAppInfoFromContext(ctx context.Context) *baseConfig.AppInfo {
-	if v := ctx.Value(constants2.AppInfoKey); v != nil {
-		if ai, ok := v.(*baseConfig.AppInfo); ok {
-			return ai
-		}
-	}
-	return nil
-}
+//func GetAppInfoFromContext(ctx context.Context) *baseConfig.AppInfo {
+//	if v := ctx.Value(constants2.AppInfoKey); v != nil {
+//		if ai, ok := v.(*baseConfig.AppInfo); ok {
+//			return ai
+//		}
+//	}
+//	return nil
+//}
 
 func GetHttpInfoFromContext(ctx context.Context) *config.HttpInfo {
 	if v := ctx.Value(constants.HttpInfoKey); v != nil {

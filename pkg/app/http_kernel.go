@@ -57,6 +57,13 @@ func (m *HttpKernel) Init(a *app.App) error {
 
 	m.Router = ginHelper.InitRouter(a.BaseConfig, m.HttpConfig)
 
+	m.Router.Use(func(c *gin.Context) {
+		// подменяем context у запроса
+		c.Request = c.Request.WithContext(a.GetContext())
+
+		c.Next()
+	})
+
 	di.Register(a.Container, m.Router)
 
 	appConfig, err := di.GetBaseConfig(a.Container)
