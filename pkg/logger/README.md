@@ -23,8 +23,8 @@ logger.FormattedInfo(
 ### Лог из `AppInfo/HttpInfo`
 
 ```go
-httpfmt.FormattedLogWithAppInfo(appInfo, httpInfo, "validation failed")
-httpfmt.FormattedErrorWithAppInfo(appInfo, httpInfo, "db error")
+httpfmt.FormattedLogWithHttpInfo(context, httpInfo, "validation failed")
+httpfmt.FormattedErrorWithHttpInfo(context, httpInfo, "db error")
 ```
 
 ---

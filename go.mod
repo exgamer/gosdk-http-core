@@ -3,9 +3,9 @@ module github.com/exgamer/gosdk-http-core
 go 1.25.5
 
 require (
-	github.com/exgamer/gosdk-core v1.0.13
-	github.com/getsentry/sentry-go v0.40.0
-	github.com/getsentry/sentry-go/gin v0.40.0
+	github.com/exgamer/gosdk-core v1.0.15
+	github.com/getsentry/sentry-go v0.41.0
+	github.com/getsentry/sentry-go/gin v0.41.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-playground/validator/v10 v10.30.1

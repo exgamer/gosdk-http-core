@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/exgamer/gosdk-core/pkg/helpers"
 	logger2 "github.com/exgamer/gosdk-core/pkg/logger"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
@@ -36,7 +35,6 @@ func LoggerMiddleware() gin.HandlerFunc {
 		c.Next()
 
 		latency := time.Since(start)
-		appInfo := helpers.GetAppInfoFromContext(c.Request.Context())
 		httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context())
 		status := c.Writer.Status()
 
@@ -54,7 +52,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 				httpEx = exception.NewInternalServerErrorException(err, nil)
 			}
 
-			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, httpEx.Error())
+			logger.FormattedError(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, httpEx.Error())
 
 			return
 		}
@@ -66,7 +64,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 				msg = "server error"
 			}
 
-			logger.FormattedError(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, msg)
+			logger.FormattedError(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, msg)
 
 			return
 		}
@@ -80,7 +78,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 		}
 		messageBuilder.WriteString("Exec time:" + latency.String())
 
-		logger.FormattedInfo(appInfo.ServiceName, httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, messageBuilder.String())
+		logger.FormattedInfo(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, messageBuilder.String())
 	}
 }
 

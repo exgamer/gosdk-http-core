@@ -3,11 +3,11 @@ package response
 import (
 	"encoding/json"
 	"errors"
+	"github.com/exgamer/gosdk-core/pkg/context"
 	exception2 "github.com/exgamer/gosdk-core/pkg/exception"
 	"net/http"
 
 	"github.com/exgamer/gosdk-core/pkg/debug"
-	corehelpers "github.com/exgamer/gosdk-core/pkg/helpers"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/gin-gonic/gin"
@@ -126,7 +126,7 @@ func Formatted(c *gin.Context) {
 		serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
 		requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
 
-		if appInfo := corehelpers.GetAppInfoFromContext(c.Request.Context()); appInfo != nil {
+		if appInfo := context.GetAppInfoFromContext(c.Request.Context()); appInfo != nil {
 			serviceName = appInfo.ServiceName
 		}
 

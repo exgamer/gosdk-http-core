@@ -40,7 +40,7 @@ func (m *HttpKernel) Init(a *app.App) error {
 
 		m.HttpConfig = httpConfig
 
-		logger.Dump(httpConfig)
+		logger.Dump(a.GetContext(), httpConfig)
 
 		di.Register(a.Container, m.HttpConfig)
 	}
