@@ -102,3 +102,127 @@ func ResponseMiddleware() gin.HandlerFunc {
 - Статус выставляется один раз (ErrorResponse).
 - Логирование / Sentry / метрики читают exception через errors.As.
 - JSON формируется в одном месте (FormattedResponse).
+
+
+# Использование ошибок на доменном слое
+
+Доменный слой **не должен знать про HTTP**.\
+Сервисы возвращают обычные `error`, но при бизнес-ошибках используют
+`AppException`.
+
+Контроллер передает любую ошибку в `ErrorResponse`, где она
+автоматически преобразуется в HTTP ответ.
+
+------------------------------------------------------------------------
+
+# Пример: Validation ошибка
+
+### Service
+
+``` go
+func (s *TariffService) Create(ctx context.Context, dto CreateTariffDto) error {
+
+    if dto.Name == "" {
+        return &exception.NewValidationException(map[string]any{
+		"name":  "Не указано имя",
+	    },
+	    false)
+    }
+
+    return nil
+}
+```
+
+------------------------------------------------------------------------
+
+# Пример: Not Found
+
+### Service
+
+``` go
+func (s *TariffService) GetById(ctx context.Context, id uint) (*Tariff, error) {
+
+    tariff, err := s.repo.GetById(ctx, id)
+    if err != nil {
+        return nil, err
+    }
+
+    if tariff == nil {
+        return nil, &exception.NewNotFoundException(errors.New("tariff not found"), false)
+        }
+    }
+
+    return tariff, nil
+}
+```
+
+------------------------------------------------------------------------
+
+# Пример: Forbidden
+
+``` go
+return &exception.NewForbiddenException(errors.New("access denied"), false) 
+```
+
+------------------------------------------------------------------------
+
+# Пример: Internal ошибка
+
+``` go
+return &exception.AppException{
+    Err: err,
+    Kind: exception.ErrorKindInternal,
+    TrackInSentry: true,
+}
+```
+
+------------------------------------------------------------------------
+
+# Controller
+
+Контроллер не анализирует тип ошибки.
+
+``` go
+func (h *Handler) GetTariff(c *gin.Context) {
+
+    result, err := h.service.GetTariff(c.Request.Context(), id)
+    if err != nil {
+        response.ErrorResponse(c, err)
+        return
+    }
+
+    response.Success(c, result)
+}
+```
+
+------------------------------------------------------------------------
+
+# Что происходит дальше
+
+Service → AppException → Controller → ErrorResponse() → HttpException →
+JSON response
+
+------------------------------------------------------------------------
+
+# Пример HTTP ответа
+
+``` json
+{
+  "status": 404,
+  "error": "not_found",
+  "message": "tariff not found",
+  "details": {
+    "id": 42
+  }
+}
+```
+
+------------------------------------------------------------------------
+
+# Главное правило
+
+**Domain / Service слой** - возвращает `AppException` - не знает про
+HTTP
+
+**Controller** - просто передает ошибку в `ErrorResponse` - не содержит
+логики обработки ошибок

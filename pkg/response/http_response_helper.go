@@ -19,19 +19,50 @@ const (
 	ctxKeyStatusCode = "status_code"
 )
 
+func mapKindToStatus(kind exception2.ErrorKind) int {
+	switch kind {
+	case exception2.ErrorKindValidation:
+		return http.StatusUnprocessableEntity
+	case exception2.ErrorKindNotFound:
+		return http.StatusNotFound
+	case exception2.ErrorKindForbidden:
+		return http.StatusForbidden
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 func ErrorResponseUntrackableSentry(c *gin.Context, statusCode int, err error, context map[string]any) {
 	ErrorResponse(c, exception.NewUntrackableHttpException(statusCode, err, context))
 }
 
 func ErrorResponse(c *gin.Context, err error) {
-	c.Set(ctxKeyException, err)
-
 	var httpEx *exception.HttpException
-	if !errors.As(err, &httpEx) {
-		httpEx = exception.NewInternalServerErrorException(err, nil)
+	if errors.As(err, &httpEx) {
+		c.Set(ctxKeyException, httpEx)
+		c.AbortWithStatus(httpEx.Code)
+
+		return
 	}
 
-	c.AbortWithStatus(httpEx.Code)
+	var appEx *exception2.AppException
+	if errors.As(err, &appEx) {
+		code := mapKindToStatus(appEx.Kind)
+		httpErr := exception.NewHttpException(
+			code,
+			appEx.Err,
+			appEx.Context,
+		)
+		httpErr.TrackInSentry = appEx.TrackInSentry
+		c.Set(ctxKeyException, httpErr)
+		c.AbortWithStatus(httpErr.Code)
+
+		return
+	}
+
+	httpErr := exception.NewInternalServerErrorException(err, nil)
+	c.Set(ctxKeyException, httpErr)
+	c.AbortWithStatus(httpErr.Code)
 }
 
 func ErrorResponseWithStatus(c *gin.Context, statusCode int, err error, context map[string]any) {
