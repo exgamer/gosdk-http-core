@@ -82,7 +82,7 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 		}
 	}
 
-	if err := c.ShouldBind(&request); err != nil {
+	if err := c.ShouldBind(request); err != nil {
 		var ve validator.ValidationErrors
 
 		if errors.As(err, &ve) {
