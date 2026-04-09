@@ -46,6 +46,24 @@ go get github.com/exgamer/gosdk-http-core
 [HTTP exceptions](pkg/exception/README.md)
 
 ---
+## SWAGGER
+
+### Генерация документации сваггера:
+```go
+go install github.com/swaggo/swag/cmd/swag@latest
+```
+
+```go
+swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1
+```
+
+Документация сваггера будет доступна по следующим эндпойнтам
+
+http://0.0.0.0:8090/rest-template/api-docs/index.html
+
+http://0.0.0.0:8090/rest-template/api-docs/doc.json
+
+---
 
 ## 🧠 Концепция HTTP Kernel
 
