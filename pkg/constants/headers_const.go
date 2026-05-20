@@ -11,5 +11,6 @@ const (
 	CompanyIdsHeaderName       string = "Company-Ids"
 	IinHeaderName              string = "Iin"
 	CacheControlHeaderName     string = "Cache-Control"
+	OriginHeaderName           string = "Origin"
 	AuthorizationHeaderName    string = "Authorization"
 )

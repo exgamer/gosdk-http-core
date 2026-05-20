@@ -43,9 +43,11 @@ func SentryMiddleware() gin.HandlerFunc {
 		serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
 		requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
 
+		appEnv := "UNKNOWN"
 		if v, ok := c.Get(constants.AppInfoKey); ok {
 			if appInfo, ok := v.(*config2.AppInfo); ok && appInfo != nil {
 				serviceName = appInfo.ServiceName
+				appEnv = appInfo.AppEnv
 			}
 		}
 
@@ -71,6 +73,7 @@ func SentryMiddleware() gin.HandlerFunc {
 		}
 
 		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetTag("environment", appEnv)
 			// Заголовки — лучше санитайзить (минимум: Authorization/Cookie) TODO расиширить
 			mapHeaders := make(map[string]any, len(c.Request.Header))
 			for key, values := range c.Request.Header {

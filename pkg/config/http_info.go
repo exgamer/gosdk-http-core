@@ -11,6 +11,7 @@ type HttpInfo struct {
 	RequestMethod string
 	RequestUrl    string
 	CacheControl  string
+	RequestOrigin string // CORS
 	LanguageCode  string
 }
 

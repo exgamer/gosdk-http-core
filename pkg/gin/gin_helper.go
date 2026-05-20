@@ -2,6 +2,9 @@ package gin
 
 import (
 	"context"
+	"net/http"
+	"time"
+
 	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
 	constants2 "github.com/exgamer/gosdk-core/pkg/constants"
 	"github.com/exgamer/gosdk-core/pkg/logger"
@@ -15,8 +18,6 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	timeout "github.com/vearne/gin-timeout"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
-	"net/http"
-	"time"
 )
 
 // InitRouter Базовая инициализация gin
@@ -37,9 +38,12 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 		prefix = "swagger"
 	}
 
-	router.GET("/"+prefix+"/api-docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	router.GET("/"+prefix+"/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": "PAGE_NOT_FOUND", "message": "404 page not found"})
+	})
+	router.NoMethod(func(c *gin.Context) {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{"code": "METHOD_NOT_ALLOWED", "message": "405 method not allowed"})
 	})
 	router.HandleMethodNotAllowed = true
 	p := ginprometheus.NewPrometheus("ginHelpers")
@@ -83,6 +87,7 @@ func GetInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
 		httpInfo.LanguageCode = constants2.LangCodeRu
 	}
 
+	httpInfo.RequestOrigin = c.GetHeader(constants.OriginHeaderName)
 	httpInfo.CacheControl = c.GetHeader(constants.CacheControlHeaderName)
 	httpInfo.RequestUrl = c.Request.URL.Path
 	httpInfo.RequestMethod = c.Request.Method
