@@ -10,7 +10,6 @@ import (
 	"github.com/exgamer/gosdk-core/pkg/logger"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
-	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-gonic/gin"
 	"github.com/go-errors/errors"
@@ -68,7 +67,7 @@ func ErrorHandler(c *gin.Context, err any) {
 		details = append(details, frame.String())
 	}
 
-	sentry.CaptureException(goErr)
+	CaptureToSentry(c, goErr)
 	c.JSON(http.StatusInternalServerError, gin.H{"message": goErr.Error(), "details": details, "success": false, "service_code": 0})
 }
 
