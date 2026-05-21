@@ -4,11 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	config2 "github.com/exgamer/gosdk-core/pkg/config"
-	"github.com/exgamer/gosdk-core/pkg/constants"
-	"github.com/exgamer/gosdk-http-core/pkg/config"
-	constants2 "github.com/exgamer/gosdk-http-core/pkg/constants"
+	"github.com/exgamer/gosdk-core/pkg/context"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
+	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 )
@@ -44,17 +42,16 @@ func SentryMiddleware() gin.HandlerFunc {
 		requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
 
 		appEnv := "UNKNOWN"
-		if v, ok := c.Get(constants.AppInfoKey); ok {
-			if appInfo, ok := v.(*config2.AppInfo); ok && appInfo != nil {
-				serviceName = appInfo.ServiceName
-				appEnv = appInfo.AppEnv
-			}
+
+		appInfo := context.GetAppInfoFromContext(c.Request.Context())
+		if appInfo != nil {
+			serviceName = appInfo.ServiceName
+			appEnv = appInfo.AppEnv
 		}
 
-		if v, ok := c.Get(constants2.HttpInfoKey); ok {
-			if httpInfo, ok := v.(*config.HttpInfo); ok && httpInfo != nil {
-				requestId = httpInfo.RequestId
-			}
+		httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context())
+		if httpInfo != nil {
+			requestId = httpInfo.RequestId
 		}
 
 		// То, что реально ушло клиенту
