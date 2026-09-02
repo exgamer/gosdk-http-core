@@ -17,6 +17,7 @@ const (
 	ctxKeyException  = "exception"
 	ctxKeyData       = "data"
 	ctxKeyStatusCode = "status_code"
+	ctxKeyRaw        = "raw_response"
 )
 
 func mapKindToStatus(kind exception2.ErrorKind) int {
@@ -174,6 +175,12 @@ func Formatted(c *gin.Context) {
 			"details":    httpEx.Context,
 		}
 
+		if isRaw(c) {
+			writeJSON(c, httpEx.Code, responseData)
+
+			return
+		}
+
 		writeJSON(c, httpEx.Code, wrapWithDebug(c, false, responseData))
 
 		return
@@ -189,7 +196,24 @@ func Formatted(c *gin.Context) {
 		}
 	}
 
+	if isRaw(c) {
+		writeJSON(c, status, data)
+
+		return
+	}
+
 	writeJSON(c, status, wrapWithDebug(c, true, data))
+}
+
+func isRaw(c *gin.Context) bool {
+	v, ok := c.Get(ctxKeyRaw)
+	if !ok {
+		return false
+	}
+
+	raw, ok := v.(bool)
+
+	return ok && raw
 }
 
 func wrapWithDebug(c *gin.Context, success bool, data any) any {

@@ -131,6 +131,67 @@ router.GET("/health", func(c *gin.Context) {
 
 ---
 
+## 📤 Формат ответа: `{success, data}` и raw-ответы
+
+По умолчанию `middleware.FormattedResponseMiddleware()` оборачивает любой ответ хендлера
+в единый конверт:
+
+```json
+{
+  "success": true,
+  "data": { "...": "..." }
+}
+```
+
+Хендлер не пишет ответ напрямую (никаких `c.JSON`) — он кладёт данные в контекст через
+`response.*`, а middleware после `c.Next()` сериализует их через `response.Formatted(c)`:
+
+```go
+// success
+response.Success(c, data)          // 200
+response.SuccessCreated(c, data)   // 201
+response.SuccessDeleted(c, data)   // 204
+
+// error
+response.BadRequest(c, err, ctx)
+response.NotFound(c, err, ctx)
+response.InternalServerError(c, err, ctx)
+// ...и т.д., см. pkg/response/http_response_helper.go
+```
+
+Ошибки оборачиваются аналогично — `{"success": false, "data": {"status", "error", "message", "request_id", "hostname", "details"}}`.
+
+### Raw-ответы (без конверта `success/data`)
+
+Для эндпойнтов с внешним/фиксированным контрактом (вебхуки, колбэки платёжных систем,
+прокси на сторонние API и т.п.), где обёртка `success/data` не нужна и мешает контракту,
+есть raw-аналоги в `pkg/response/http_raw_response_helper.go` — по одной функции на каждую
+существующую:
+
+```go
+// success (raw)
+response.RawSuccess(c, data)          // 200, тело = data как есть
+response.RawCreated(c, data)          // 201
+response.RawDeleted(c, data)          // 204
+response.Raw(c, data, http.StatusTeapot) // произвольный статус
+
+// error (raw) — конверт success/data снимается,
+// но структура тела ошибки (status/error/message/...) сохраняется
+response.BadRequestRaw(c, err, ctx)
+response.NotFoundRaw(c, err, ctx)
+response.InternalServerErrorRaw(c, err, ctx)
+// ...и т.д.
+```
+
+Raw-режим работает через тот же `FormattedResponseMiddleware` — переключение делается
+флагом в `gin.Context`, отдельная middleware не нужна.
+
+**Важно:** это расширение полностью аддитивное — старые `response.Success/BadRequest/...`
+не изменены и продолжают оборачивать ответ как раньше. Флаг raw выставляется только внутри
+новых `*Raw`-функций, поэтому существующие эндпойнты не затрагиваются.
+
+---
+
 ## 🧱 Метрики прометея
 
 После подключения Http ядра в приложении уже будет эедпойнт /metrics, который отдает метрики для прометея
