@@ -10,7 +10,6 @@ import (
 	"github.com/exgamer/gosdk-http-core/pkg/config"
 	ginHelper "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/exgamer/gosdk-http-core/pkg/metrics"
-	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
@@ -43,16 +42,6 @@ func (m *HttpKernel) Init(a *app.App) error {
 		logger.Dump(a.GetContext(), httpConfig)
 
 		di.Register(a.Container, m.HttpConfig)
-	}
-	// Инициализация сентри
-	if m.HttpConfig.SentryDsn != "" {
-		if err := sentry.Init(sentry.ClientOptions{
-			AttachStacktrace: true,
-			TracesSampleRate: 1.0,
-			Dsn:              m.HttpConfig.SentryDsn,
-		}); err != nil {
-			return err
-		}
 	}
 
 	m.Router = ginHelper.InitRouter(a.BaseConfig, m.HttpConfig)
@@ -110,8 +99,6 @@ func (m *HttpKernel) Stop(ctx context.Context) error {
 	}
 
 	// если ctx без дедлайна, App уже даёт timeout — ок
-	err := m.Server.Shutdown(ctx)
-	_ = sentry.Flush(2 * time.Second)
-
-	return err
+	// flush sentry-события на shutdown - зона ответственности SentryKernel (gosdk-sentry-core)
+	return m.Server.Shutdown(ctx)
 }
