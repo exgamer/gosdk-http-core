@@ -44,12 +44,23 @@ func CaptureToSentry(c *gin.Context, err error) {
 		status = httpEx.Code
 	}
 
+	// c.FullPath() - шаблон роута ("/city/:id"), а не реальный URL с
+	// подставленным id - так однотипные ошибки на разных id группируются
+	// в Sentry по одному эндпойнту. Пустая строка бывает для несматченных
+	// роутов (404) - тогда используем реальный путь запроса.
+	route := c.FullPath()
+	if route == "" {
+		route = c.Request.URL.Path
+	}
+	endpoint := c.Request.Method + " " + route
+
 	responseData := map[string]any{
 		"status":     status,
 		"error":      httpEx.GetErrorType(),
 		"message":    httpEx.Error(),
 		"request_id": requestId,
 		"hostname":   serviceName,
+		"endpoint":   endpoint,
 		"details":    httpEx.Context,
 	}
 
@@ -82,6 +93,12 @@ func CaptureToSentry(c *gin.Context, err error) {
 
 	errorreporter.Capture(c.Request.Context(), err, errorreporter.Options{
 		Level: level,
+		// endpoint тегом (не только в Extra) - чтобы можно было
+		// фильтровать/группировать issues в Sentry по конкретному
+		// эндпойнту, а не только видеть его внутри деталей события.
+		Tags: map[string]string{
+			"endpoint": endpoint,
+		},
 		Extra: map[string]any{
 			"header": mapHeaders,
 			"query":  mapQueries,
