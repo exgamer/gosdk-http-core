@@ -217,6 +217,27 @@ JSON response
 }
 ```
 
+Поле `error` зависит от HTTP-статуса:
+
+| Статус | `error` |
+|---|---|
+| 400 | `incorrect_parameters` |
+| 401 | `unauthorized` |
+| 403 | `access_denied` |
+| 404 | `not_found` |
+| 405 | `method_not_allowed` |
+| 406 | `operation_failed` |
+| 408 | `request_timeout` |
+| 409 | `conflict` |
+| 413 | `payload_too_large` |
+| 422 | `validation_error` |
+| 429 | `too_many_requests` |
+| прочие 4xx | `client_error` |
+| 500 и прочие 5xx | `internal_server_error` |
+| 502 | `bad_gateway` |
+| 503 | `service_unavailable` |
+| 504 | `gateway_timeout` |
+
 ------------------------------------------------------------------------
 
 # Главное правило
