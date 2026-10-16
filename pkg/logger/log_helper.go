@@ -13,6 +13,11 @@ func FormattedInfo(ctx context.Context, method string, uri string, status int, r
 	logger.Info(ctx, getFormattedMessage(method, uri, status, requestId, message))
 }
 
+// FormattedWarning Форматированный лог предупреждения
+func FormattedWarning(ctx context.Context, method string, uri string, status int, requestId string, message string) {
+	logger.Warning(ctx, getFormattedMessage(method, uri, status, requestId, message))
+}
+
 // FormattedError Форматированный лог ошибки
 func FormattedError(ctx context.Context, method string, uri string, status int, requestId string, message string) {
 	logger.Error(ctx, getFormattedMessage(method, uri, status, requestId, message))

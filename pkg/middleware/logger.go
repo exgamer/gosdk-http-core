@@ -52,6 +52,13 @@ func LoggerMiddleware() gin.HandlerFunc {
 				httpEx = exception.NewInternalServerErrorException(err, nil)
 			}
 
+			// 4xx — ошибка клиента, warning; 5xx и прочее — error
+			if isClientError(httpEx.Code) && status < http.StatusInternalServerError {
+				logger.FormattedWarning(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, httpEx.Error())
+
+				return
+			}
+
 			logger.FormattedError(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, httpEx.Error())
 
 			return
@@ -78,8 +85,18 @@ func LoggerMiddleware() gin.HandlerFunc {
 		}
 		messageBuilder.WriteString("Exec time:" + latency.String())
 
+		if isClientError(status) {
+			logger.FormattedWarning(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, messageBuilder.String())
+
+			return
+		}
+
 		logger.FormattedInfo(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, messageBuilder.String())
 	}
+}
+
+func isClientError(status int) bool {
+	return status >= http.StatusBadRequest && status < http.StatusInternalServerError
 }
 
 // TODO вынести в настройку, чтобы можно было внедрять свое

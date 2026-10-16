@@ -1,6 +1,6 @@
 # HTTP Formatted Logger (wrapper over global stdlib logger)
 
-Этот модуль даёт **FormattedInfo/FormattedError** (HTTP-формат) поверх вашего **глобального логгера** на `log.Logger`.
+Этот модуль даёт **FormattedInfo/FormattedWarning/FormattedError** (HTTP-формат) поверх вашего **глобального логгера** на `log.Logger`.
 
 
 ## HTTP-форматтер

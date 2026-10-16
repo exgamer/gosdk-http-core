@@ -12,18 +12,16 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/iancoleman/strcase"
 	"net/http"
+	"net/url"
+	"slices"
 	"strconv"
 )
 
 // ValidateRequestQuery - Валидация GET параметров HTTP реквеста
 func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		for n, f := range request.CustomValidationRules() {
-			v.RegisterValidation(n, f)
-		}
-	}
-
-	if err := c.BindQuery(request); err != nil {
+	// binding.Query без Bind: BindQuery сам отвечает 400 и кладёт ошибку в c.Errors, ответ ниже — 422
+	err := bindWithCustomRules(c, request, binding.Query)
+	if err != nil {
 		var ve validator.ValidationErrors
 
 		if errors.As(err, &ve) {
@@ -59,9 +57,8 @@ func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 		var parseNumTypeError *strconv.NumError
 
 		if errors.As(err, &parseNumTypeError) {
-			out := make(map[string]any)
-			out[strcase.ToSnake(parseNumTypeError.Num)] = parseNumTypeError.Error()
-			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, parseNumTypeError, out)
+			out := numErrorDetails(c.Request.URL.Query(), parseNumTypeError)
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
 
 			return false
 		}
@@ -76,13 +73,10 @@ func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 
 // ValidateRequestBody - Валидация тела HTTP реквеста
 func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		for n, f := range request.CustomValidationRules() {
-			v.RegisterValidation(n, f)
-		}
-	}
+	bodyBinding := binding.Default(c.Request.Method, c.ContentType())
 
-	if err := c.ShouldBind(request); err != nil {
+	err := bindWithCustomRules(c, request, bodyBinding)
+	if err != nil {
 		var ve validator.ValidationErrors
 
 		if errors.As(err, &ve) {
@@ -130,6 +124,29 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 	}
 
 	return true
+}
+
+// numErrorDetails Ошибка разбора числа/флага по параметрам запроса: ключ — параметр со значением из ошибки,
+// сообщение — без самого значения (ошибка gin поле не называет)
+func numErrorDetails(query url.Values, numErr *strconv.NumError) map[string]any {
+	msg := "Invalid value, expected number"
+	if numErr.Func == "ParseBool" {
+		msg = "Invalid value, expected boolean"
+	}
+
+	out := make(map[string]any)
+
+	for key, values := range query {
+		if slices.Contains(values, numErr.Num) {
+			out[key] = msg
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
 }
 
 func GetIntQueryParam(c *gin.Context, name string) (int, error) {
