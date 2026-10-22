@@ -1,9 +1,7 @@
 package middleware
 
 import (
-	"context"
 	"github.com/exgamer/gosdk-core/pkg/app"
-	"github.com/exgamer/gosdk-http-core/pkg/constants"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/gin-gonic/gin"
 )
@@ -13,10 +11,7 @@ func RequestInfoMiddleware(a *app.App) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		httpInfo := gin2.GetInstanceHttpInfo(c)
 
-		ctx := c.Request.Context()
-		ctx = context.WithValue(ctx, constants.HttpInfoKey, httpInfo)
-
-		c.Request = c.Request.WithContext(ctx)
+		c.Request = c.Request.WithContext(gin2.WithHttpInfo(c.Request.Context(), httpInfo))
 
 		c.Next()
 	}

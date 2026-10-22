@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/exgamer/gosdk-core/pkg/app"
 	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
-	coreConstants "github.com/exgamer/gosdk-core/pkg/constants"
+	coreContext "github.com/exgamer/gosdk-core/pkg/context"
 	"github.com/exgamer/gosdk-core/pkg/di"
 	"github.com/exgamer/gosdk-core/pkg/logger"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
@@ -96,12 +96,13 @@ func (m *HttpKernel) Stop(ctx context.Context) error {
 // контекстом приложения: тот отменяется по SIGTERM раньше, чем Shutdown
 // дождётся текущих запросов, и они падали бы с context canceled. Отмена при
 // уходе клиента сохраняется — записи, которые обязаны завершиться, сервис
-// отвязывает сам: context.WithoutCancel(ctx).
+// отвязывает сам: context.WithoutCancel(ctx). Нет AppInfo в контексте
+// приложения — контекст запроса не дополняется.
 func withAppInfo(appCtx func() context.Context) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		appInfo := appCtx().Value(coreConstants.AppInfoKey)
-		//lint:ignore SA1029 gosdk-core читает AppInfo по этому строковому ключу
-		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), coreConstants.AppInfoKey, appInfo))
+		if info := coreContext.GetAppInfoFromContext(appCtx()); info != nil {
+			c.Request = c.Request.WithContext(coreContext.WithAppInfo(c.Request.Context(), info))
+		}
 
 		c.Next()
 	}

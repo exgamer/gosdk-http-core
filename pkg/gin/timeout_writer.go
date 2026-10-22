@@ -20,16 +20,20 @@ const noWritten = -1
 // либо ответ обработчика после его завершения (complete), либо ответ таймаута по дедлайну (timeout).
 // Исключения — потоковый ответ после первого Flush и Hijack: дальше обработчик пишет в origin сам,
 // ответ таймаута не пишется. Работа с origin в обход буфера — тоже под mu.
+// Состояние таймаута наступает с дедлайном, а не с запуском горутины context.AfterFunc: обработчик,
+// увидевший отмену контекста, видит и статус ответа таймаута (лог и Sentry паники — со статусом клиента).
 type timeoutWriter struct {
-	origin gin.ResponseWriter
-	header http.Header
-	body   bytes.Buffer
+	origin   gin.ResponseWriter
+	header   http.Header
+	body     bytes.Buffer
+	deadline <-chan struct{}
 
 	mu          sync.Mutex
 	status      int
 	size        int
 	wroteHeader bool
 	timedOut    bool
+	answered    bool
 	streaming   bool
 	hijacked    bool
 	done        bool
@@ -37,12 +41,14 @@ type timeoutWriter struct {
 
 var _ gin.ResponseWriter = (*timeoutWriter)(nil)
 
-func newTimeoutWriter(origin gin.ResponseWriter) *timeoutWriter {
+// newTimeoutWriter deadline — Done() контекста с таймаутом обработчика.
+func newTimeoutWriter(origin gin.ResponseWriter, deadline <-chan struct{}) *timeoutWriter {
 	return &timeoutWriter{
-		origin: origin,
-		header: make(http.Header),
-		status: origin.Status(),
-		size:   noWritten,
+		origin:   origin,
+		header:   make(http.Header),
+		deadline: deadline,
+		status:   origin.Status(),
+		size:     noWritten,
 	}
 }
 
@@ -55,15 +61,37 @@ func (w *timeoutWriter) timeout(ctx context.Context) {
 		return
 	}
 
+	w.markTimedOut()
 	w.writeTimeout(ctx)
 }
 
-// writeTimeout Пишет в origin ответ таймаута; вызывается под mu.
-func (w *timeoutWriter) writeTimeout(ctx context.Context) {
-	w.timedOut = true
-	if !w.wroteHeader {
-		w.status = timeoutStatus
+// expire Переводит буфер в состояние таймаута, если дедлайн наступил, а горутина context.AfterFunc
+// ещё не отработала; вызывается под mu в начале методов обработчика.
+func (w *timeoutWriter) expire() {
+	if w.timedOut || w.done || w.hijacked || w.streaming {
+		return
 	}
+
+	select {
+	case <-w.deadline:
+		w.markTimedOut()
+	default:
+	}
+}
+
+// markTimedOut Статус ответа — статус таймаута: его получит клиент; вызывается под mu.
+func (w *timeoutWriter) markTimedOut() {
+	w.timedOut = true
+	w.status = timeoutStatus
+}
+
+// writeTimeout Пишет в origin ответ таймаута один раз; вызывается под mu.
+func (w *timeoutWriter) writeTimeout(ctx context.Context) {
+	if w.answered {
+		return
+	}
+
+	w.answered = true
 
 	// Content-Length и Flush: клиент получает ответ целиком сразу, не дожидаясь конца обработчика.
 	// Connection: close: соединение занято обработчиком до его конца, следующий запрос клиента
@@ -94,13 +122,12 @@ func (w *timeoutWriter) complete(ctx context.Context) {
 		return
 	}
 
+	w.expire()
 	w.done = true
 
-	if !w.timedOut && ctx.Err() != nil {
-		w.writeTimeout(ctx)
-	}
-
 	if w.timedOut {
+		w.writeTimeout(ctx)
+
 		return
 	}
 
@@ -153,6 +180,8 @@ func (w *timeoutWriter) WriteHeader(code int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	w.expire()
+
 	if w.streaming {
 		w.origin.WriteHeader(code)
 
@@ -171,6 +200,8 @@ func (w *timeoutWriter) WriteHeaderNow() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	w.expire()
+
 	if w.streaming {
 		w.origin.WriteHeaderNow()
 
@@ -187,6 +218,8 @@ func (w *timeoutWriter) WriteHeaderNow() {
 func (w *timeoutWriter) Write(data []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	w.expire()
 
 	if w.streaming {
 		return w.origin.Write(data)
@@ -218,6 +251,8 @@ func (w *timeoutWriter) Status() int {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	w.expire()
+
 	if w.streaming {
 		return w.origin.Status()
 	}
@@ -245,6 +280,8 @@ func (w *timeoutWriter) Written() bool {
 func (w *timeoutWriter) Flush() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	w.expire()
 
 	if w.done || w.timedOut || w.hijacked {
 		return
@@ -278,6 +315,8 @@ func (w *timeoutWriter) startStreaming() {
 func (w *timeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	w.expire()
 
 	if w.done || w.timedOut {
 		return nil, nil, http.ErrHandlerTimeout

@@ -330,7 +330,7 @@ func TestTimeoutWriter_AnswerAfterDeadlineGetsTimeoutAnswer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	tw := newTimeoutWriter(c.Writer)
+	tw := newTimeoutWriter(c.Writer, ctx.Done())
 	tw.Header().Set("X-Late", "1")
 	tw.WriteHeader(http.StatusOK)
 
@@ -342,6 +342,43 @@ func TestTimeoutWriter_AnswerAfterDeadlineGetsTimeoutAnswer(t *testing.T) {
 	tw.timeout(ctx)
 
 	assertTimeoutAnswer(t, w, "answer after the deadline")
+}
+
+// After the deadline, before the timeout goroutine runs, the handler already sees the timeout status:
+// what it writes is dropped, streaming does not start, the client gets the timeout answer.
+func TestTimeoutWriter_DeadlineBeforeTimeoutGoroutine(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	tw := newTimeoutWriter(c.Writer, ctx.Done())
+	tw.WriteHeader(http.StatusCreated)
+	cancel()
+
+	if got := tw.Status(); got != http.StatusServiceUnavailable {
+		t.Errorf("Status() after the deadline = %d, want 503", got)
+	}
+
+	tw.WriteHeader(http.StatusInternalServerError)
+	tw.Flush()
+
+	if n, err := tw.WriteString("late"); n != 0 || err != nil {
+		t.Errorf("WriteString after the deadline = (%d, %v), want (0, nil)", n, err)
+	}
+
+	if got := tw.Status(); got != http.StatusServiceUnavailable {
+		t.Errorf("Status() after WriteHeader(500) = %d, want 503", got)
+	}
+
+	if w.Code != http.StatusOK || w.Body.Len() != 0 {
+		t.Errorf("origin before complete = %d %q, want nothing written", w.Code, w.Body.String())
+	}
+
+	tw.complete(ctx)
+	tw.timeout(ctx)
+
+	assertTimeoutAnswer(t, w, "deadline before the timeout goroutine")
 }
 
 func openStream(t *testing.T, url string) (*http.Response, *bufio.Reader) {

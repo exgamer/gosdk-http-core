@@ -26,7 +26,7 @@ func handlerTimeout(timeout time.Duration) gin.HandlerFunc {
 		defer cancel()
 
 		request := c.Request
-		tw := newTimeoutWriter(c.Writer)
+		tw := newTimeoutWriter(c.Writer, ctx.Done())
 		stop := context.AfterFunc(ctx, func() { tw.timeout(ctx) })
 
 		defer func() {

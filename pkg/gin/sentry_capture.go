@@ -15,8 +15,14 @@ import (
 // знает про Sentry - реальную отправку делает адаптер, зарегистрированный
 // через errorreporter.SetReporter (см. gosdk-sentry-core). Без него вызов
 // безопасен и просто ничего не отправляет.
-// Вызывается из SentryMiddleware (обычные ошибки) и ErrorHandler (panic).
+// Вызывается из SentryMiddleware (обычные ошибки); паника — через captureToSentry.
 func CaptureToSentry(c *gin.Context, err error) {
+	captureToSentry(c, err, c.Writer.Status())
+}
+
+// captureToSentry Отправляет событие со статусом ответа status; 0 — статус из HttpException.
+// Паника передаёт статус, который получит клиент: событие уходит до ответа.
+func captureToSentry(c *gin.Context, err error, status int) {
 	var httpEx *exception.HttpException
 	if !errors.As(err, &httpEx) {
 		httpEx = exception.NewInternalServerErrorException(err, nil)
@@ -39,7 +45,6 @@ func CaptureToSentry(c *gin.Context, err error) {
 		requestId = httpInfo.RequestId
 	}
 
-	status := c.Writer.Status()
 	if status == 0 {
 		status = httpEx.Code
 	}
@@ -91,7 +96,8 @@ func CaptureToSentry(c *gin.Context, err error) {
 		level = errorreporter.LevelWarning
 	}
 
-	errorreporter.Capture(c.Request.Context(), err, errorreporter.Options{
+	// Capture возвращает ту же ошибку с пометкой "отправлена" (для проброса), а не ошибку отправки; здесь её не пробрасываем.
+	_ = errorreporter.Capture(c.Request.Context(), err, errorreporter.Options{
 		Level: level,
 		// endpoint тегом (не только в Extra) - чтобы можно было
 		// фильтровать/группировать issues в Sentry по конкретному

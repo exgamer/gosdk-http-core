@@ -84,6 +84,41 @@ http://0.0.0.0:8090/rest-template/doc.json
 
 ---
 
+## HTTP_ERROR_DETAILS
+
+Паника в обработчике или middleware под `InitRouter`: ответ 500 без деталей, полная ошибка - в лог и Sentry.
+
+```json
+{"message": "internal server error", "details": [], "success": false, "service_code": 0}
+```
+
+В лог - одна запись `[ERROR]`: `[request_id,METHOD,path,status] panic: <текст>` и стек (переводы строк логгер
+`gosdk-core` пишет как `\n`, запись остаётся одной строкой). Путь - без query, заголовки и тело запроса не пишутся.
+Статус - тот, что получил клиент: 500, после `HANDLER_TIMEOUT` - 503. В Sentry - одно событие, как раньше.
+
+Текст паники и стек в ответе включает переменная `HTTP_ERROR_DETAILS` - только для локальной отладки:
+
+| `HTTP_ERROR_DETAILS` | Текст паники и стек в ответе 500 |
+|---|---|
+| `true`, `1` (регистр и пробелы по краям не важны) | есть: `message` - текст паники, `details` - стек |
+| не задана, пустая, `false`, `0` | нет |
+| любое другое значение (`yes`, `on`, опечатка) | нет, в лог - `[WARN]` |
+
+На проде `HTTP_ERROR_DETAILS` не задавать: SDK окружение не проверяет, с `true` клиент получит текст паники и стек
+(пути файлов, внутренние данные).
+
+При старте `InitRouter` пишет в лог `[INFO] error details disabled: HTTP_ERROR_DETAILS=""` или
+`error details enabled: HTTP_ERROR_DETAILS="true"` - включённую настройку видно в логе старта. Нераспознанное
+значение - дополнительно `[WARN] unrecognized HTTP_ERROR_DETAILS="yes", error details disabled; use true/1 or false/0`.
+
+Роутер без `InitRouter`, где паники ловит `ErrorHandler` пакета `pkg/gin`, - ответ всегда без деталей, настройка не
+читается. Подключать через `gin.CustomRecoveryWithWriter(nil, ginHelper.ErrorHandler)` (`ginHelper` - импорт
+`pkg/gin` SDK, `gin` - `github.com/gin-gonic/gin`), а не `gin.CustomRecovery`: тот
+пишет в stderr дамп gin `[Recovery]` с заголовками запроса: `Authorization` gin маскирует, а `Cookie` уходит открытым
+текстом (в debug-режиме gin и при обрыве соединения клиентом).
+
+---
+
 ## 🧠 Концепция HTTP Kernel
 
 HTTP kernel — это kernel приложения, который:
@@ -108,6 +143,11 @@ ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 defer cancel()
 ```
 
+Данные запроса (`HttpInfo`), которые кладёт `RequestInfoMiddleware`, читаются только через
+`gin.GetHttpInfoFromContext(ctx)`; в тестах положить их в контекст - `gin.WithHttpInfo(ctx, info)`. AppInfo - через
+`GetAppInfoFromContext` / `WithAppInfo` пакета `context` из `gosdk-core`. Чтение по строковым ключам
+(`ctx.Value("http_info")`, `ctx.Value("app_info")`) возвращает `nil`.
+
 ---
 
 ## 🔌 Регистрация HTTP Kernel
@@ -130,11 +170,13 @@ HTTP kernel использует конфигурацию из `pkg/config`.
 SERVER_ADDRESS=0.0.0.0:8090
 SWAGGER_PREFIX=rest-template
 SWAGGER_ENABLED=
+HTTP_ERROR_DETAILS=
 HANDLER_TIMEOUT=30
 SENTRY_DSN=
 ```
 
 `SWAGGER_ENABLED` пустой - Swagger выключен; значения и прод - в разделе [SWAGGER](#swagger).
+`HTTP_ERROR_DETAILS` пустой - ответ 500 без деталей; на проде не задавать - раздел [HTTP_ERROR_DETAILS](#http_error_details).
 
 Таймауты HTTP-сервера, секунды. Не заданы (или `0`) — значения по умолчанию, `-1` — без таймаута:
 

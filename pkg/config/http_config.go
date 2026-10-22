@@ -11,6 +11,10 @@ type HttpConfig struct {
 	// не задана, false/0 и любое другое значение — Swagger выключен.
 	SwaggerEnabled string `mapstructure:"SWAGGER_ENABLED" json:"swagger_enabled"`
 
+	// ErrorDetails Полная ошибка (текст паники и стек) в ответе 500. Включают true/1 (без учёта регистра,
+	// пробелы по краям обрезаются); не задана, false/0 и любое другое значение — выключено. На проде не задавать.
+	ErrorDetails string `mapstructure:"HTTP_ERROR_DETAILS" json:"http_error_details"`
+
 	// Таймауты http.Server, секунды. 0 (не задано) — значение по умолчанию
 	// (15 / 10 / 30 / 60), -1 — без таймаута.
 	ServerReadTimeoutSec       int `mapstructure:"SERVER_READ_TIMEOUT_SEC"        json:"server_read_timeout_sec"`

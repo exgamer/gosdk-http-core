@@ -1,21 +1,26 @@
 package gin
 
 import (
-	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	baseConfig "github.com/exgamer/gosdk-core/pkg/config"
 	constants2 "github.com/exgamer/gosdk-core/pkg/constants"
 	"github.com/exgamer/gosdk-core/pkg/logger"
-	"github.com/exgamer/gosdk-http-core/pkg/config"
-	"github.com/exgamer/gosdk-http-core/pkg/constants"
 	"github.com/gin-gonic/gin"
 	"github.com/go-errors/errors"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
+
+	"github.com/exgamer/gosdk-http-core/pkg/config"
+	"github.com/exgamer/gosdk-http-core/pkg/constants"
+	httpLogger "github.com/exgamer/gosdk-http-core/pkg/logger"
 )
+
+// panicMessage Текст ответа 500 при панике, когда детали ошибки выключены.
+const panicMessage = "internal server error"
 
 // InitRouter Базовая инициализация gin
 func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig) *gin.Engine {
@@ -56,22 +61,81 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 		router.Use(handlerTimeout(time.Duration(httpConfig.HandlerTimeout) * time.Second))
 	}
 
-	router.Use(gin.CustomRecovery(ErrorHandler))
+	details, recognized := parseBoolSetting(httpConfig.ErrorDetails)
+	logBoolSetting("error details", "HTTP_ERROR_DETAILS", httpConfig.ErrorDetails, details, recognized)
+
+	// writer nil: gin не пишет дамп [Recovery] с заголовками запроса в stderr, паника — одной записью в лог SDK.
+	router.Use(gin.CustomRecoveryWithWriter(nil, errorHandler(details)))
 
 	return router
 }
 
-// ErrorHandler Обработчик ошибок gin
+// ErrorHandler Обработчик паники для gin.CustomRecovery без InitRouter (gateway): детали в ответе выключены.
 func ErrorHandler(c *gin.Context, err any) {
+	// Wrap — здесь, в функции, которую вызывает gin: от неё отсчитывается стек.
 	goErr := errors.Wrap(err, 2)
-	details := make([]string, 0)
+	respondPanic(c, goErr, false)
+}
 
-	for _, frame := range goErr.StackFrames() {
-		details = append(details, frame.String())
+// errorHandler Обработчик паники InitRouter с настройкой HTTP_ERROR_DETAILS, разобранной при старте.
+func errorHandler(details bool) gin.RecoveryFunc {
+	return func(c *gin.Context, err any) {
+		goErr := errors.Wrap(err, 2)
+		respondPanic(c, goErr, details)
+	}
+}
+
+// respondPanic Одно событие в Sentry, ответ 500, одна запись [ERROR] в лог.
+// Abort: после паники в middleware следующие обработчики цепочки не выполняются (как в gin.Recovery).
+// Событие и лог — со статусом, который получит клиент (после таймаута обработчика — 503).
+func respondPanic(c *gin.Context, goErr *errors.Error, details bool) {
+	captureToSentry(c, goErr, panicStatus(c))
+	c.AbortWithStatusJSON(http.StatusInternalServerError, panicBody(goErr, details))
+	logPanic(c, goErr)
+}
+
+// panicStatus Ставит статус ответа паники до события Sentry и возвращает тот, что получит клиент.
+// Writer не меняет уже отправленный статус и статус таймаута: тогда вернётся он, а не 500.
+func panicStatus(c *gin.Context) int {
+	if !c.Writer.Written() {
+		c.Writer.WriteHeader(http.StatusInternalServerError)
 	}
 
-	CaptureToSentry(c, goErr)
-	c.JSON(http.StatusInternalServerError, gin.H{"message": goErr.Error(), "details": details, "success": false, "service_code": 0})
+	return c.Writer.Status()
+}
+
+// panicBody Тело ответа 500. Без деталей — только константы: текст паники и стек не читаются.
+func panicBody(goErr *errors.Error, details bool) gin.H {
+	if !details {
+		return gin.H{"message": panicMessage, "details": []string{}, "success": false, "service_code": 0}
+	}
+
+	frames := make([]string, 0)
+	for _, frame := range goErr.StackFrames() {
+		frames = append(frames, frame.String())
+	}
+
+	return gin.H{"message": goErr.Error(), "details": frames, "success": false, "service_code": 0}
+}
+
+// logPanic Пишет [request_id,METHOD,path,status] panic: <текст>\n<стек>. Путь — без query,
+// заголовки и тело не пишутся. Нет HttpInfo (gateway без RequestInfoMiddleware) — метод и путь из запроса.
+func logPanic(c *gin.Context, goErr *errors.Error) {
+	ctx := c.Request.Context()
+	method := c.Request.Method
+	path := c.Request.URL.Path
+	requestID := ""
+
+	if httpInfo := GetHttpInfoFromContext(ctx); httpInfo != nil {
+		method = httpInfo.RequestMethod
+		path = httpInfo.RequestUrl
+		requestID = httpInfo.RequestId
+	}
+
+	stack := strings.TrimSuffix(string(goErr.Stack()), "\n")
+	message := "panic: " + goErr.Error() + "\n" + stack
+
+	httpLogger.FormattedError(ctx, method, path, c.Writer.Status(), requestID, message)
 }
 
 func GetInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
@@ -97,13 +161,4 @@ func GetInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
 	httpInfo.RequestHost = c.Request.Host
 
 	return httpInfo
-}
-
-func GetHttpInfoFromContext(ctx context.Context) *config.HttpInfo {
-	if v := ctx.Value(constants.HttpInfoKey); v != nil {
-		if hi, ok := v.(*config.HttpInfo); ok {
-			return hi
-		}
-	}
-	return nil
 }
