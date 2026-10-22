@@ -1,9 +1,9 @@
 module github.com/exgamer/gosdk-http-core
 
-go 1.26.0
+go 1.27.3
 
 require (
-	github.com/exgamer/gosdk-core v1.0.28
+	github.com/exgamer/gosdk-core v1.0.29
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-playground/validator/v10 v10.30.5
@@ -13,7 +13,6 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
-	github.com/vearne/gin-timeout v0.2.3
 	github.com/zsais/go-gin-prometheus v1.0.3
 )
 

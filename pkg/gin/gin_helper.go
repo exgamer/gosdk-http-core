@@ -14,7 +14,6 @@ import (
 	"github.com/go-errors/errors"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	timeout "github.com/vearne/gin-timeout"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
 )
 
@@ -36,7 +35,13 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 		prefix = "swagger"
 	}
 
-	router.GET("/"+prefix+"/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	enabled, recognized := swaggerEnabled(httpConfig.SwaggerEnabled)
+	logSwaggerState(httpConfig.SwaggerEnabled, enabled, recognized)
+
+	if enabled {
+		router.GET("/"+prefix+"/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
+
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": "PAGE_NOT_FOUND", "message": "404 page not found"})
 	})
@@ -48,7 +53,7 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 	p.Use(router)
 	//router.Use(gin.Logger())
 	if httpConfig.HandlerTimeout > 0 {
-		router.Use(timeout.Timeout(timeout.WithTimeout(time.Duration(httpConfig.HandlerTimeout) * time.Second)))
+		router.Use(handlerTimeout(time.Duration(httpConfig.HandlerTimeout) * time.Second))
 	}
 
 	router.Use(gin.CustomRecovery(ErrorHandler))

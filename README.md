@@ -57,11 +57,30 @@ go install github.com/swaggo/swag/cmd/swag@latest
 swag init -g main.go -o docs --parseDependency --parseInternal --parseDepth 1
 ```
 
-Документация сваггера будет доступна по следующим эндпойнтам
+### Включение
 
-http://0.0.0.0:8090/rest-template/api-docs/index.html
+Swagger по умолчанию выключен на любом окружении, `APP_ENV` на это не влияет. Включает переменная `SWAGGER_ENABLED`:
 
-http://0.0.0.0:8090/rest-template/api-docs/doc.json
+| `SWAGGER_ENABLED` | Swagger |
+|---|---|
+| `true`, `1` (регистр и пробелы по краям не важны) | включён |
+| не задана, пустая, `false`, `0` | выключен |
+| любое другое значение (`yes`, `on`, опечатка) | выключен, в лог - `[WARN]` |
+
+При старте `InitRouter` пишет в лог `[INFO] swagger enabled: SWAGGER_ENABLED="true"` или
+`swagger disabled: SWAGGER_ENABLED=""`.
+
+Включённый Swagger доступен по путям (префикс - `SWAGGER_PREFIX`, если пуст - `APP_NAME`, если пуст и он - `swagger`):
+
+http://0.0.0.0:8090/rest-template/index.html
+
+http://0.0.0.0:8090/rest-template/doc.json
+
+Выключенный - маршрута нет, `index.html`, `doc.json` и статика UI отвечают 404
+`{"code":"PAGE_NOT_FOUND","message":"404 page not found"}`.
+
+На проде SDK документацию аутентификацией не закрывает: `SWAGGER_ENABLED=true` там - только вместе с закрытием пути
+`/<prefix>/` на ingress/шлюзе.
 
 ---
 
@@ -110,9 +129,12 @@ HTTP kernel использует конфигурацию из `pkg/config`.
 ```env
 SERVER_ADDRESS=0.0.0.0:8090
 SWAGGER_PREFIX=rest-template
+SWAGGER_ENABLED=
 HANDLER_TIMEOUT=30
 SENTRY_DSN=
 ```
+
+`SWAGGER_ENABLED` пустой - Swagger выключен; значения и прод - в разделе [SWAGGER](#swagger).
 
 Таймауты HTTP-сервера, секунды. Не заданы (или `0`) — значения по умолчанию, `-1` — без таймаута:
 

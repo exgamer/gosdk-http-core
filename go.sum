@@ -16,8 +16,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/exgamer/gosdk-core v1.0.28 h1:XY/OQOWcw1F2IoPo3VzMaqcZqN5monWoocAnNqsu5dU=
-github.com/exgamer/gosdk-core v1.0.28/go.mod h1:BkDESXj9stNzQdTGy1b50cOHvAbWxwIxH6pjfaxAZLQ=
+github.com/exgamer/gosdk-core v1.0.29 h1:LvjcTs4+AFsrA8BOOngFmgas86MMyVxhuxmvSuhWPv8=
+github.com/exgamer/gosdk-core v1.0.29/go.mod h1:PehNVPtKS1egbRY6h3/tfD/uFjaRcsybnZSJ5dx/lNY=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.10.1 h1:b0/UzAf9yR5rhf3RPm9gf3ehBPpf0oZKIjtpKrx59Ho=
@@ -163,8 +163,6 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.3.2 h1:zkEASHHyEClGeURfgNT9PJZVfAbs9oEX9QXggwWNJbc=
 github.com/ugorji/go/codec v1.3.2/go.mod h1:pRBVtBSKl77K30Bv8R2P+cLSGaTtex6fsA2Wjqmfxj4=
-github.com/vearne/gin-timeout v0.2.3 h1:C67/Y7IA6kb6cUbp8SEkYnIuP+FCc6nFD1sWQih2CNg=
-github.com/vearne/gin-timeout v0.2.3/go.mod h1:U91+iMIf1Ic5GmaNdhFFeCZVFMPuSUK7Q3CwNeMPwhA=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 github.com/zsais/go-gin-prometheus v1.0.3 h1:NIYXItaoGNiyDWXqrIzfQHWcRnen+iwgAw4sX/UieiM=
 github.com/zsais/go-gin-prometheus v1.0.3/go.mod h1:avQI7yOKIhpOi4QJxFZdmZb47AEjmS4MTC4Z6PsNmiA=

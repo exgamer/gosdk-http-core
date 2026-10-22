@@ -7,6 +7,10 @@ type HttpConfig struct {
 	HandlerTimeout     int    `mapstructure:"HANDLER_TIMEOUT"      json:"handler_timeout"`
 	CorsAllowedOrigins string `mapstructure:"CORS_ALLOWED_ORIGINS" json:"cors_allowed_origins"`
 
+	// SwaggerEnabled Включают true/1 (без учёта регистра, пробелы по краям обрезаются);
+	// не задана, false/0 и любое другое значение — Swagger выключен.
+	SwaggerEnabled string `mapstructure:"SWAGGER_ENABLED" json:"swagger_enabled"`
+
 	// Таймауты http.Server, секунды. 0 (не задано) — значение по умолчанию
 	// (15 / 10 / 30 / 60), -1 — без таймаута.
 	ServerReadTimeoutSec       int `mapstructure:"SERVER_READ_TIMEOUT_SEC"        json:"server_read_timeout_sec"`
