@@ -54,7 +54,9 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 		c.JSON(http.StatusMethodNotAllowed, gin.H{"code": "METHOD_NOT_ALLOWED", "message": "405 method not allowed"})
 	})
 	router.HandleMethodNotAllowed = true
-	p := ginprometheus.NewPrometheus("ginHelpers")
+	// DisableBodyReading: метрики не читают тело запроса — размер берётся из Content-Length. Иначе middleware
+	// метрик читает тело целиком (io.ReadAll) до обработчиков: в память без лимита размера и до дедлайнов сервиса
+	p := ginprometheus.NewWithConfig(ginprometheus.Config{Subsystem: "ginHelpers", DisableBodyReading: true})
 	p.Use(router)
 	//router.Use(gin.Logger())
 	if httpConfig.HandlerTimeout > 0 {
