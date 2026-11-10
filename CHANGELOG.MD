@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.0
+
+Swagger-тип тела ошибки без обёртки. Сигнатуры не изменились.
+
+### Добавлено
+- `structures.RawErrorResponse` — тело ошибки ответов `response.*Raw` (`ErrorResponseRaw`, `ErrorResponseWithStatusRaw`,
+  `BadRequestRaw` и т. п.): `{status, request_id, error, message, hostname, details}` без `success`/`data`.
+
 ## v1.4.1
 
 Метрики больше не читают тело запроса. Сигнатуры не изменились.

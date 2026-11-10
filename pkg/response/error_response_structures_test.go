@@ -127,3 +127,25 @@ func TestRawAccepted(t *testing.T) {
 		t.Fatalf("тело: %s", w.Body.String())
 	}
 }
+
+func TestRawErrorResponseMatchesRawBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+	ErrorResponseWithStatusRaw(c, http.StatusUnauthorized, errors.New("ошибка"), map[string]any{"code": "some_code"})
+	Formatted(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("статус %d, ожидали 401", w.Code)
+	}
+
+	var got structures.RawErrorResponse
+	decodeStrict(t, w.Body.Bytes(), &got)
+
+	if got.Status != http.StatusUnauthorized || got.Message != "ошибка" || got.Details["code"] != "some_code" {
+		t.Fatalf("поля не разобраны: %+v; тело: %s", got, w.Body.String())
+	}
+}
