@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.3.0
+
+Типы ответов для Swagger на 401, 413, 415, 500 и 503 и успешный ответ 202. Сигнатуры не изменились.
+
+### Добавлено
+- `structures.UnauthorizedErrorResponse` (401), `PayloadTooLargeErrorResponse` (413),
+  `UnsupportedMediaTypeErrorResponse` (415), `InternalServerErrorResponse` (500 — ошибка обработчика в общей
+  обёртке), `ServiceUnavailableErrorResponse` (503). Поля совпадают с телом `response.Formatted`; `details` —
+  `map[string]any`. `InternalServerResponse` по-прежнему описывает только ответ на панику.
+- `response.SuccessAccepted` — 202 в общей обёртке, `response.RawAccepted` — 202 без обёртки.
+
 ## v1.2.0
 
 Паника больше не отдаёт клиенту текст и стек: ответ 500 без деталей, полная ошибка - в лог и Sentry. HttpInfo и

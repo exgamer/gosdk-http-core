@@ -28,6 +28,11 @@ func RawCreated(c *gin.Context, data any) {
 	Raw(c, data, http.StatusCreated)
 }
 
+// RawAccepted — 202 без обёртки
+func RawAccepted(c *gin.Context, data any) {
+	Raw(c, data, http.StatusAccepted)
+}
+
 func RawDeleted(c *gin.Context, data any) {
 	Raw(c, data, http.StatusNoContent)
 }

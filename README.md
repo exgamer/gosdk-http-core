@@ -239,6 +239,7 @@ router.GET("/health", func(c *gin.Context) {
 // success
 response.Success(c, data)          // 200
 response.SuccessCreated(c, data)   // 201
+response.SuccessAccepted(c, data)  // 202
 response.SuccessDeleted(c, data)   // 204
 
 // error
@@ -261,6 +262,7 @@ response.InternalServerError(c, err, ctx)
 // success (raw)
 response.RawSuccess(c, data)          // 200, тело = data как есть
 response.RawCreated(c, data)          // 201
+response.RawAccepted(c, data)         // 202
 response.RawDeleted(c, data)          // 204
 response.Raw(c, data, http.StatusTeapot) // произвольный статус
 

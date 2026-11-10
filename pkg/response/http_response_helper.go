@@ -132,6 +132,12 @@ func SuccessCreated(c *gin.Context, data any) {
 	c.Set(ctxKeyStatusCode, http.StatusCreated)
 }
 
+// SuccessAccepted — 202: запрос принят, обработка продолжается асинхронно
+func SuccessAccepted(c *gin.Context, data any) {
+	c.Set(ctxKeyData, data)
+	c.Set(ctxKeyStatusCode, http.StatusAccepted)
+}
+
 func SuccessDeleted(c *gin.Context, data any) {
 	c.Set(ctxKeyData, data)
 	c.Set(ctxKeyStatusCode, http.StatusNoContent)
