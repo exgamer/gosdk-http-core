@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.4.0
+
+Проверка параметров пути запроса. Сигнатуры не изменились.
+
+### Добавлено
+- `validators.ValidateRequestPath(c, request)` — биндинг и проверка параметров пути (`/stations/:code`) в поля с
+  тегом `uri`: правила — тег `binding` и `CustomValidationRules`, сообщения — `CustomValidationMessage` /
+  `ValidationMessage`, как у `ValidateRequestQuery`. Ошибка — 422 с ключом по полю (snake_case), значение параметра
+  в ответ не попадает; ошибка разбора числа — «Invalid value, expected number» по имени параметра. Query-параметры
+  с тем же именем значение из пути не подменяют.
+
 ## v1.3.0
 
 Типы ответов для Swagger на 401, 413, 415, 500 и 503 и успешный ответ 202. Сигнатуры не изменились.

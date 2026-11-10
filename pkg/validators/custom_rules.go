@@ -35,6 +35,16 @@ func bindWithCustomRules(c *gin.Context, request validation.IRequest, b binding.
 	return c.ShouldBindWith(request, b)
 }
 
+// bindPathWithCustomRules То же для параметров пути (c.ShouldBindUri с регистрацией правил запроса)
+func bindPathWithCustomRules(c *gin.Context, request validation.IRequest) error {
+	registerCustomRules(request)
+
+	customRules.RLock()
+	defer customRules.RUnlock()
+
+	return binding.Uri.BindUri(pathValues(c.Params), request)
+}
+
 func registerCustomRules(request validation.IRequest) {
 	v, ok := binding.Validator.Engine().(*validator.Validate)
 	if !ok {

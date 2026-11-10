@@ -71,6 +71,60 @@ func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 	return true
 }
 
+// ValidateRequestPath - Валидация параметров пути HTTP реквеста (`/stations/:code`): поля запроса с тегом `uri`,
+// правила — тегом `binding` и CustomValidationRules, как у ValidateRequestQuery. Ошибка — 422 с ключом по полю,
+// без значения параметра в ответе
+func ValidateRequestPath(c *gin.Context, request validation.IRequest) bool {
+	err := bindPathWithCustomRules(c, request)
+	if err == nil {
+		return true
+	}
+
+	var ve validator.ValidationErrors
+
+	if errors.As(err, &ve) {
+		out := make(map[string]any, len(ve))
+
+		for _, fe := range ve {
+			msg := request.CustomValidationMessage(fe)
+
+			if msg == fe.Tag() {
+				msg = request.ValidationMessage(fe)
+			}
+
+			out[strcase.ToSnake(fe.Field())] = msg
+		}
+
+		response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
+
+		return false
+	}
+
+	var parseNumTypeError *strconv.NumError
+
+	if errors.As(err, &parseNumTypeError) {
+		out := numErrorDetails(pathValues(c.Params), parseNumTypeError)
+		response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
+
+		return false
+	}
+
+	response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("incorrect request path"), nil)
+
+	return false
+}
+
+// pathValues Параметры пути в виде url.Values — для binding.Uri и для поиска параметра по значению ошибки разбора
+func pathValues(params gin.Params) url.Values {
+	out := make(url.Values, len(params))
+
+	for _, p := range params {
+		out[p.Key] = append(out[p.Key], p.Value)
+	}
+
+	return out
+}
+
 // ValidateRequestBody - Валидация тела HTTP реквеста
 func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 	bodyBinding := binding.Default(c.Request.Method, c.ContentType())
