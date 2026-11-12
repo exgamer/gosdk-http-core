@@ -189,6 +189,13 @@ SENTRY_DSN=
 
 Долгие ответы (выгрузки, стриминг) обрываются по `SERVER_WRITE_TIMEOUT_SEC` — для них увеличьте его или задайте `-1`.
 
+CORS (`middleware.CorsMiddleware`) — выключен, пока `CORS_ALLOWED_ORIGINS` пуст:
+
+| Переменная | Что задаёт |
+|---|---|
+| `CORS_ALLOWED_ORIGINS` | разрешённые origins через запятую; `*` — любой origin (вместе с `Access-Control-Allow-Credentials: true` — не для сервисов с cookie-сессией) |
+| `CORS_EXTRA_ALLOWED_HEADERS` | дополнительные заголовки для `Access-Control-Allow-Headers` через запятую, например `X-CSRF-Token`; добавляются к базовому списку `Origin, Content-Type, Accept, Authorization, X-Request-Id`, повторы и пустые элементы пропускаются; не задана — ответ прежний |
+
 ---
 
 ## 🧩 Работа с роутером

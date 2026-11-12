@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.6.0
+
+Настраиваемые дополнительные заголовки CORS. Обратно совместимо: сигнатуры не изменились, без новой переменной ответ
+CORS прежний.
+
+### Добавлено
+- `config.HttpConfig.CorsExtraAllowedHeaders` (env `CORS_EXTRA_ALLOWED_HEADERS`) — дополнительные заголовки для
+  `Access-Control-Allow-Headers` через запятую (например, `X-CSRF-Token` для SPA на другом домене с CSRF-защитой).
+  Добавляются к базовому списку `Origin, Content-Type, Accept, Authorization, X-Request-Id`; пустые элементы и повторы
+  (без учёта регистра) пропускаются. Не задана — заголовок ответа тот же, что в v1.5.0. Заголовки CORS по-прежнему
+  отдаются только разрешённым origins из `CORS_ALLOWED_ORIGINS`.
+
 ## v1.5.0
 
 Swagger-тип тела ошибки без обёртки. Сигнатуры не изменились.

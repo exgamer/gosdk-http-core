@@ -7,6 +7,10 @@ type HttpConfig struct {
 	HandlerTimeout     int    `mapstructure:"HANDLER_TIMEOUT"      json:"handler_timeout"`
 	CorsAllowedOrigins string `mapstructure:"CORS_ALLOWED_ORIGINS" json:"cors_allowed_origins"`
 
+	// CorsExtraAllowedHeaders Дополнительные заголовки для Access-Control-Allow-Headers (через запятую), например
+	// X-CSRF-Token. Добавляются к базовому списку; не задано — ответ CORS прежний.
+	CorsExtraAllowedHeaders string `mapstructure:"CORS_EXTRA_ALLOWED_HEADERS" json:"cors_extra_allowed_headers"`
+
 	// SwaggerEnabled Включают true/1 (без учёта регистра, пробелы по краям обрезаются);
 	// не задана, false/0 и любое другое значение — Swagger выключен.
 	SwaggerEnabled string `mapstructure:"SWAGGER_ENABLED" json:"swagger_enabled"`
