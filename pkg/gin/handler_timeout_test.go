@@ -285,39 +285,115 @@ func TestInitRouter_PanicAfterDeadlineKeepsTimeoutAnswer(t *testing.T) {
 	assertTimeoutAnswer(t, serve(r, http.MethodGet, "/panic"), "GET /panic")
 }
 
-// A request canceled by the client before the deadline gets the timeout answer, as with gin-timeout,
-// and the handler sees context.Canceled.
-func TestInitRouter_ClientCancelGetsTimeoutAnswer(t *testing.T) {
-	r := newRouter(t, &baseConfig.BaseConfig{Name: "svc"}, config.HttpConfig{HandlerTimeout: 1})
-	started := make(chan struct{})
-	ctxErr := make(chan error, 1)
-	r.GET("/slow", func(c *gin.Context) {
-		close(started)
-		waitDone(c.Request.Context(), 3*time.Second)
-		ctxErr <- c.Request.Context().Err()
-	})
+// A request canceled by the client before the deadline is not a timeout: no 503 and no timeout body,
+// the status is the handler's, or 499 if the handler wrote nothing; the handler sees context.Canceled.
+func TestInitRouter_ClientCancelIsNotTimeout(t *testing.T) {
+	cases := []struct {
+		name     string
+		write    func(c *gin.Context)
+		wantCode int
+		wantBody string
+	}{
+		{name: "handler wrote nothing", write: func(*gin.Context) {}, wantCode: clientClosedStatus},
+		{
+			name:     "handler answered 499",
+			write:    func(c *gin.Context) { c.String(clientClosedStatus, "canceled") },
+			wantCode: clientClosedStatus,
+			wantBody: "canceled",
+		},
+		{
+			name:     "handler answered 200",
+			write:    func(c *gin.Context) { c.String(http.StatusOK, "done") },
+			wantCode: http.StatusOK,
+			wantBody: "done",
+		},
+	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newRouter(t, &baseConfig.BaseConfig{Name: "svc"}, config.HttpConfig{HandlerTimeout: 1})
+			started := make(chan struct{})
+			ctxErr := make(chan error, 1)
+			status := make(chan int, 1)
+			r.GET("/slow", func(c *gin.Context) {
+				close(started)
+				waitDone(c.Request.Context(), 3*time.Second)
+				ctxErr <- c.Request.Context().Err()
+				tc.write(c)
+				status <- c.Writer.Status()
+			})
 
-	go func() {
-		<-started
-		cancel()
-	}()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-	start := time.Now()
+			go func() {
+				<-started
+				cancel()
+			}()
+
+			start := time.Now()
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/slow", nil).WithContext(ctx))
+
+			if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+				t.Errorf("GET /slow canceled by the client ended in %v, want right after the cancel", elapsed)
+			}
+
+			if err := <-ctxErr; !errors.Is(err, context.Canceled) {
+				t.Errorf("handler ctx.Err() = %v, want context.Canceled", err)
+			}
+
+			if got := <-status; got != tc.wantCode {
+				t.Errorf("handler c.Writer.Status() = %d, want %d", got, tc.wantCode)
+			}
+
+			if w.Code != tc.wantCode || w.Body.String() != tc.wantBody {
+				t.Errorf("GET /slow = %d %q, want %d %q", w.Code, w.Body.String(), tc.wantCode, tc.wantBody)
+			}
+
+			if w.Header().Get("Connection") == "close" {
+				t.Error("Connection: close of the timeout answer on a client cancel")
+			}
+		})
+	}
+}
+
+// The timeout goroutine started by a client cancel writes nothing: Status() is 499 while the handler wrote nothing,
+// the handler can still write, and complete passes its answer through.
+func TestTimeoutWriter_ClientCancelBeforeDeadline(t *testing.T) {
+	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/slow", nil).WithContext(ctx))
+	c, _ := gin.CreateTestContext(w)
 
-	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
-		t.Errorf("GET /slow canceled by the client answered in %v, want right after the cancel", elapsed)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+	cancel()
+
+	tw := newTimeoutWriter(ctx, c.Writer)
+	tw.timeout(ctx)
+
+	if w.Body.Len() != 0 || w.Header().Get("Content-Type") != "" {
+		t.Fatalf("origin after the cancel = %d %q, want nothing written", w.Code, w.Body.String())
 	}
 
-	if err := <-ctxErr; !errors.Is(err, context.Canceled) {
-		t.Errorf("GET /slow: handler ctx.Err() = %v, want context.Canceled", err)
+	if got := tw.Status(); got != clientClosedStatus {
+		t.Errorf("Status() after the cancel, nothing written = %d, want %d", got, clientClosedStatus)
 	}
 
-	assertTimeoutAnswer(t, w, "GET /slow")
+	tw.WriteHeader(http.StatusConflict)
+
+	if n, err := tw.WriteString("conflict"); n != len("conflict") || err != nil {
+		t.Errorf("WriteString after the cancel = (%d, %v), want (%d, nil)", n, err, len("conflict"))
+	}
+
+	if got := tw.Status(); got != http.StatusConflict {
+		t.Errorf("Status() after WriteHeader(409) = %d, want 409", got)
+	}
+
+	tw.complete(ctx)
+
+	if w.Code != http.StatusConflict || w.Body.String() != "conflict" {
+		t.Errorf("answer = %d %q, want 409 conflict", w.Code, w.Body.String())
+	}
 }
 
 // A handler that answers after the deadline but before the timeout goroutine runs gets the timeout answer,
@@ -327,10 +403,10 @@ func TestTimeoutWriter_AnswerAfterDeadlineGetsTimeoutAnswer(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now())
+	defer cancel()
 
-	tw := newTimeoutWriter(c.Writer, ctx.Done())
+	tw := newTimeoutWriter(ctx, c.Writer)
 	tw.Header().Set("X-Late", "1")
 	tw.WriteHeader(http.StatusOK)
 
@@ -351,10 +427,12 @@ func TestTimeoutWriter_DeadlineBeforeTimeoutGoroutine(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	tw := newTimeoutWriter(c.Writer, ctx.Done())
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	tw := newTimeoutWriter(ctx, c.Writer)
 	tw.WriteHeader(http.StatusCreated)
-	cancel()
+	<-ctx.Done()
 
 	if got := tw.Status(); got != http.StatusServiceUnavailable {
 		t.Errorf("Status() after the deadline = %d, want 503", got)

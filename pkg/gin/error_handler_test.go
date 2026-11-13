@@ -316,10 +316,10 @@ func TestRespondPanic_DeadlineBeforeTimeoutGoroutine(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodGet, "/panic", nil)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now())
+	defer cancel()
 
-	tw := newTimeoutWriter(c.Writer, ctx.Done())
+	tw := newTimeoutWriter(ctx, c.Writer)
 	c.Writer = tw
 
 	respondPanic(c, goerrors.New(panicSecret), true)

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -22,11 +23,13 @@ const noWritten = -1
 // ответ таймаута не пишется. Работа с origin в обход буфера — тоже под mu.
 // Состояние таймаута наступает с дедлайном, а не с запуском горутины context.AfterFunc: обработчик,
 // увидевший отмену контекста, видит и статус ответа таймаута (лог и Sentry паники — со статусом клиента).
+// Отмена контекста без дедлайна (клиент оборвал запрос) таймаутом не считается: ответ — обработчика,
+// без ответа обработчика — статус clientClosedStatus.
 type timeoutWriter struct {
-	origin   gin.ResponseWriter
-	header   http.Header
-	body     bytes.Buffer
-	deadline <-chan struct{}
+	origin gin.ResponseWriter
+	header http.Header
+	body   bytes.Buffer
+	ctxErr func() error // Err() контекста с таймаутом обработчика
 
 	mu          sync.Mutex
 	status      int
@@ -41,23 +44,24 @@ type timeoutWriter struct {
 
 var _ gin.ResponseWriter = (*timeoutWriter)(nil)
 
-// newTimeoutWriter deadline — Done() контекста с таймаутом обработчика.
-func newTimeoutWriter(origin gin.ResponseWriter, deadline <-chan struct{}) *timeoutWriter {
+// newTimeoutWriter ctx — контекст с таймаутом обработчика.
+func newTimeoutWriter(ctx context.Context, origin gin.ResponseWriter) *timeoutWriter {
 	return &timeoutWriter{
-		origin:   origin,
-		header:   make(http.Header),
-		deadline: deadline,
-		status:   origin.Status(),
-		size:     noWritten,
+		origin: origin,
+		header: make(http.Header),
+		ctxErr: ctx.Err,
+		status: origin.Status(),
+		size:   noWritten,
 	}
 }
 
-// timeout Отдаёт ответ таймаута, если ответ ещё не отдан и не начат. Вызывается из горутины context.AfterFunc.
+// timeout Отдаёт ответ таймаута, если наступил дедлайн, а ответ ещё не отдан и не начат.
+// Вызывается из горутины context.AfterFunc — и при обрыве запроса клиентом: тогда ничего не делает.
 func (w *timeoutWriter) timeout(ctx context.Context) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.done || w.hijacked || w.streaming {
+	if w.done || w.hijacked || w.streaming || !w.deadlineExceeded() {
 		return
 	}
 
@@ -72,11 +76,20 @@ func (w *timeoutWriter) expire() {
 		return
 	}
 
-	select {
-	case <-w.deadline:
+	if w.deadlineExceeded() {
 		w.markTimedOut()
-	default:
 	}
+}
+
+// deadlineExceeded Контекст завершён дедлайном (таймаут обработчика или дедлайн родителя), а не отменой.
+func (w *timeoutWriter) deadlineExceeded() bool {
+	return errors.Is(w.ctxErr(), context.DeadlineExceeded)
+}
+
+// clientClosed Клиент оборвал запрос (context.Canceled), а обработчик ещё ничего не написал:
+// статус ответа — clientClosedStatus; вызывается под mu.
+func (w *timeoutWriter) clientClosed() bool {
+	return !w.timedOut && !w.wroteHeader && w.size == noWritten && errors.Is(w.ctxErr(), context.Canceled)
 }
 
 // markTimedOut Статус ответа — статус таймаута: его получит клиент; вызывается под mu.
@@ -129,6 +142,10 @@ func (w *timeoutWriter) complete(ctx context.Context) {
 		w.writeTimeout(ctx)
 
 		return
+	}
+
+	if w.clientClosed() {
+		w.status = clientClosedStatus
 	}
 
 	w.writeBuffered()
@@ -255,6 +272,10 @@ func (w *timeoutWriter) Status() int {
 
 	if w.streaming {
 		return w.origin.Status()
+	}
+
+	if w.clientClosed() {
+		return clientClosedStatus
 	}
 
 	return w.status

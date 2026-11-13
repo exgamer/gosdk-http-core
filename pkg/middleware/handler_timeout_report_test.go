@@ -82,6 +82,62 @@ func TestHandlerTimeoutReport_TimeoutWithoutError(t *testing.T) {
 	assertEvents(t, reporter, 0)
 }
 
+// A request canceled by the client before HANDLER_TIMEOUT is not a timeout: 499, one [WARN] request line
+// with status 499, no [ERROR], no events — whether the handler wrote nothing or answered 499 itself.
+func TestHandlerTimeoutReport_ClientCancelIsWarning(t *testing.T) {
+	const clientClosed = 499
+
+	cases := []struct {
+		name  string
+		write func(c *gin.Context)
+	}{
+		{name: "handler wrote nothing", write: func(*gin.Context) {}},
+		{name: "handler answered 499 with an untrackable exception", write: func(c *gin.Context) {
+			c.Set("exception", exception.NewUntrackableHttpException(clientClosed, errors.New("client closed request"), nil))
+			c.AbortWithStatus(clientClosed)
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter := withReportReporter(t)
+			r := newReportRouter(t)
+			buf := captureReportLog(t)
+			started := make(chan struct{})
+			r.GET("/slow", func(c *gin.Context) {
+				close(started)
+				waitDeadline(c.Request.Context())
+				tc.write(c)
+			})
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			go func() {
+				<-started
+				cancel()
+			}()
+
+			req := httptest.NewRequest(http.MethodGet, "/slow", nil).WithContext(ctx)
+			req.Header.Set(constants.RequestIdHeaderName, "rid-report")
+
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != clientClosed || w.Body.String() == reportTimeoutBody {
+				t.Errorf("answer = %d %q, want 499 without the timeout body", w.Code, w.Body.String())
+			}
+
+			lines := reportLines(buf)
+			if len(lines) != 1 || !strings.Contains(lines[0], "[WARN] [rid-report,GET,/slow,499] ") {
+				t.Errorf("log = %q, want one line [WARN] [rid-report,GET,/slow,499]", lines)
+			}
+
+			assertEvents(t, reporter, 0)
+		})
+	}
+}
+
 // A panic before the deadline — 500 without details, one LevelError event,
 // one [ERROR] panic record with status 500 (LoggerMiddleware does not write after a panic).
 func TestHandlerTimeoutReport_PanicBeforeDeadline(t *testing.T) {
