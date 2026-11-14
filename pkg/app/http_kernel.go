@@ -67,6 +67,8 @@ func (m *HttpKernel) Init(a *app.App) error {
 }
 
 func (m *HttpKernel) Start(a *app.App) error {
+	ginHelper.CheckTimeoutExemptions(m.Router)
+
 	go func() {
 		if err := m.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			if a != nil {

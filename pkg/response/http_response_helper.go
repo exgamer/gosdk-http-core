@@ -18,6 +18,7 @@ const (
 	ctxKeyData       = "data"
 	ctxKeyStatusCode = "status_code"
 	ctxKeyRaw        = "raw_response"
+	ctxKeyNoBody     = "no_body_response"
 )
 
 func mapKindToStatus(kind exception2.ErrorKind) int {
@@ -143,12 +144,29 @@ func SuccessDeleted(c *gin.Context, data any) {
 	c.Set(ctxKeyStatusCode, http.StatusNoContent)
 }
 
+// NoContent Ответ без тела со статусом status (0 и меньше — 204): Formatted не пишет JSON-обёртку.
+// Для ответов, где тело не нужно или запрещено протоколом (вебхук, back-channel logout, 204).
+func NoContent(c *gin.Context, status int) {
+	if status <= 0 {
+		status = http.StatusNoContent
+	}
+
+	c.Set(ctxKeyNoBody, true)
+	c.Set(ctxKeyStatusCode, status)
+}
+
 func FormattedSuccessResponse(c *gin.Context, data any) {
 	Success(c, data)
 	Formatted(c)
 }
 
 func Formatted(c *gin.Context) {
+	// Обработчик уже записал тело сам (файл, текст, c.JSON): вторая запись дописала бы JSON к его телу.
+	// Только заголовки (AbortWithStatus у ErrorResponse) — не тело: ответ пишется, как раньше.
+	if c.Writer.Size() > 0 {
+		return
+	}
+
 	// ---- ERROR PATH ----
 	if exObj, exists := c.Get(ctxKeyException); exists {
 		err, ok := exObj.(error)
@@ -200,6 +218,13 @@ func Formatted(c *gin.Context) {
 		if sc, ok := v.(int); ok && sc > 0 {
 			status = sc
 		}
+	}
+
+	if noBody, _ := c.Get(ctxKeyNoBody); noBody == true {
+		c.Status(status)
+		c.Writer.WriteHeaderNow()
+
+		return
 	}
 
 	if isRaw(c) {

@@ -1,6 +1,8 @@
 package gin
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -56,8 +58,16 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 	router.HandleMethodNotAllowed = true
 	// DisableBodyReading: метрики не читают тело запроса — размер берётся из Content-Length. Иначе middleware
 	// метрик читает тело целиком (io.ReadAll) до обработчиков: в память без лимита размера и до дедлайнов сервиса
-	p := ginprometheus.NewWithConfig(ginprometheus.Config{Subsystem: "ginHelpers", DisableBodyReading: true})
-	p.Use(router)
+	if metricsEnabled(httpConfig.MetricsEnabled) {
+		p := ginprometheus.NewWithConfig(ginprometheus.Config{Subsystem: "ginHelpers", DisableBodyReading: true})
+		if strings.EqualFold(strings.TrimSpace(httpConfig.MetricsURLLabel), "route") {
+			p.ReqCntURLLabelMappingFn = routeLabel
+		}
+
+		p.Use(router)
+	} else {
+		logger.Info(context.Background(), fmt.Sprintf("metrics disabled: METRICS_ENABLED=%q (ginHelpers metrics and /metrics off)", httpConfig.MetricsEnabled))
+	}
 	//router.Use(gin.Logger())
 	if httpConfig.HandlerTimeout > 0 {
 		router.Use(handlerTimeout(time.Duration(httpConfig.HandlerTimeout) * time.Second))
@@ -70,6 +80,25 @@ func InitRouter(baseConfig *baseConfig.BaseConfig, httpConfig *config.HttpConfig
 	router.Use(gin.CustomRecoveryWithWriter(nil, errorHandler(details)))
 
 	return router
+}
+
+// metricsEnabled Метрики выключает только явное false/0 (без учёта регистра); не задано и прочее — включены.
+func metricsEnabled(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "false", "0":
+		return false
+	}
+
+	return true
+}
+
+// routeLabel Метка url — шаблон маршрута: число серий не растёт с идентификаторами в пути.
+func routeLabel(c *gin.Context) string {
+	if route := c.FullPath(); route != "" {
+		return route
+	}
+
+	return "unmatched"
 }
 
 // ErrorHandler Обработчик паники для gin.CustomRecovery без InitRouter (gateway): детали в ответе выключены.

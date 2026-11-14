@@ -69,23 +69,17 @@ func captureToSentry(c *gin.Context, err error, status int) {
 		"details":    httpEx.Context,
 	}
 
+	// Чувствительные заголовки и параметры (IsSensitiveKey: Authorization, Cookie, code, state, *token*, *secret*…,
+	// SENSITIVE_KEYS) уходят в событие замаскированными.
 	mapHeaders := make(map[string]any, len(c.Request.Header))
-	for key, values := range c.Request.Header {
-		if key == "Authorization" || key == "Cookie" {
-			mapHeaders[fmt.Sprintf("header_%s", key)] = "*****"
-			continue
-		}
+	for key, values := range MaskHeaders(c.Request.Header, "*****") {
 		if len(values) > 0 {
 			mapHeaders[fmt.Sprintf("header_%s", key)] = values[0]
 		}
 	}
 
 	mapQueries := make(map[string]any)
-	for key, values := range c.Request.URL.Query() {
-		if key == "token" || key == "access_token" {
-			mapQueries[fmt.Sprintf("query_%s", key)] = "*****"
-			continue
-		}
+	for key, values := range MaskQuery(c.Request.URL.Query(), "*****") {
 		if len(values) > 0 {
 			mapQueries[fmt.Sprintf("query_%s", key)] = values[0]
 		}

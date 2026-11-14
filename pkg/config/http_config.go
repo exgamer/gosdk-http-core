@@ -19,6 +19,14 @@ type HttpConfig struct {
 	// пробелы по краям обрезаются); не задана, false/0 и любое другое значение — выключено. На проде не задавать.
 	ErrorDetails string `mapstructure:"HTTP_ERROR_DETAILS" json:"http_error_details"`
 
+	// MetricsEnabled Метрики ginHelpers_* и маршрут /metrics на роутере. false/0 — выключены; не задана и любое другое
+	// значение — включены (как раньше). Выключают, если /metrics не должен быть на публичном адресе сервиса.
+	MetricsEnabled string `mapstructure:"METRICS_ENABLED" json:"metrics_enabled"`
+
+	// MetricsURLLabel Метка url метрик ginHelpers_*: route — шаблон маршрута (c.FullPath(), «/items/:id»;
+	// несматченный — «unmatched»), число серий ограничено; не задана и любое другое значение — путь запроса, как раньше.
+	MetricsURLLabel string `mapstructure:"METRICS_URL_LABEL" json:"metrics_url_label"`
+
 	// Таймауты http.Server, секунды. 0 (не задано) — значение по умолчанию
 	// (15 / 10 / 30 / 60), -1 — без таймаута.
 	ServerReadTimeoutSec       int `mapstructure:"SERVER_READ_TIMEOUT_SEC"        json:"server_read_timeout_sec"`

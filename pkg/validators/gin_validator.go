@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
-	"github.com/iancoleman/strcase"
 	"net/http"
 	"net/url"
 	"slices"
@@ -34,7 +33,7 @@ func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 					msg = request.ValidationMessage(fe)
 				}
 
-				out[strcase.ToSnake(fe.Field())] = msg
+				out[fieldErrorKey(request, fe, tagsQuery)] = msg
 			}
 
 			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
@@ -47,7 +46,7 @@ func ValidateRequestQuery(c *gin.Context, request validation.IRequest) bool {
 
 		if errors.As(err, &unmarshalTypeError) {
 			out := make(map[string]any)
-			out[strcase.ToSnake(unmarshalTypeError.Field)] = fmt.Sprintf("Invalid type expected %s but got %s", unmarshalTypeError.Type, unmarshalTypeError.Value)
+			out[typeErrorKey(unmarshalTypeError.Field)] = fmt.Sprintf("Invalid type expected %s but got %s", unmarshalTypeError.Type, unmarshalTypeError.Value)
 			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
 
 			return false
@@ -92,7 +91,7 @@ func ValidateRequestPath(c *gin.Context, request validation.IRequest) bool {
 				msg = request.ValidationMessage(fe)
 			}
 
-			out[strcase.ToSnake(fe.Field())] = msg
+			out[fieldErrorKey(request, fe, tagsPath)] = msg
 		}
 
 		response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
@@ -143,7 +142,7 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 					msg = request.ValidationMessage(fe)
 				}
 
-				out[strcase.ToSnake(fe.Field())] = msg
+				out[fieldErrorKey(request, fe, tagsBody)] = msg
 			}
 
 			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
@@ -156,7 +155,7 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 
 		if errors.As(err, &unmarshalTypeError) {
 			out := make(map[string]any)
-			out[strcase.ToSnake(unmarshalTypeError.Field)] = fmt.Sprintf("Invalid type expected %s but got %s", unmarshalTypeError.Type, unmarshalTypeError.Value)
+			out[typeErrorKey(unmarshalTypeError.Field)] = fmt.Sprintf("Invalid type expected %s but got %s", unmarshalTypeError.Type, unmarshalTypeError.Value)
 
 			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
 
@@ -236,7 +235,7 @@ func BindANdValidateStruct[T any](byte []byte, i *T) (map[string]string, error) 
 
 		if errors.As(err, &ve) {
 			for _, fe := range ve {
-				out[strcase.ToSnake(fe.Field())] = fe.Error()
+				out[fieldErrorKey(i, fe, tagsBody)] = fe.Error()
 			}
 		}
 

@@ -24,12 +24,14 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 		req := c.Request
 		headers := sanitizeHeaders(req.Header)
-		queryParams := req.URL.Query()
+		queryParams := gin2.MaskQuery(req.URL.Query(), "***")
 
+		// Тело читается только для debug-лога: до 1 МиБ в лог, обработчик получает тело целиком
+		// (прочитанная часть + остаток исходного тела).
 		var requestBody []byte
-		if req.Body != nil {
-			requestBody, _ = io.ReadAll(io.LimitReader(req.Body, 1<<20))
-			req.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+		if req.Body != nil && req.Body != http.NoBody && logger2.IsDebugLevel() {
+			requestBody, _ = io.ReadAll(io.LimitReader(req.Body, logBodyLimit))
+			req.Body = readCloser{Reader: io.MultiReader(bytes.NewReader(requestBody), req.Body), Closer: req.Body}
 		}
 
 		c.Next()
@@ -99,18 +101,18 @@ func isClientError(status int) bool {
 	return status >= http.StatusBadRequest && status < http.StatusInternalServerError
 }
 
-// TODO вынести в настройку, чтобы можно было внедрять свое
+// logBodyLimit Сколько байт тела запроса попадает в debug-лог.
+const logBodyLimit = 1 << 20
+
+// readCloser Тело запроса после чтения части для лога: читается прочитанная часть и остаток, Close — исходного тела.
+type readCloser struct {
+	io.Reader
+	io.Closer
+}
+
+// sanitizeHeaders Чувствительные заголовки (gin.IsSensitiveKey, SENSITIVE_KEYS) — «***».
 func sanitizeHeaders(h http.Header) http.Header {
-	c := h.Clone()
-
-	if c.Get("Authorization") != "" {
-		c.Set("Authorization", "***")
-	}
-	if c.Get("Cookie") != "" {
-		c.Set("Cookie", "***")
-	}
-
-	return c
+	return gin2.MaskHeaders(h, "***")
 }
 
 func headersToJSON(h http.Header) string {

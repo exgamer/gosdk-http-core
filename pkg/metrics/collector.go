@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"errors"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
 	"sync"
@@ -39,9 +41,25 @@ func (m *Collector) init() {
 	)
 }
 
+// register Регистрирует гистограмму в реестре по умолчанию. Уже зарегистрированная такая же (второй NewCollector в
+// процессе: второе приложение, тесты) — берётся она, а не паника; прочие ошибки регистрации — паника, как MustRegister.
 func (m *Collector) register() {
 	m.once.Do(func() {
-		prometheus.MustRegister(m.httpRequestMetrics)
+		err := prometheus.Register(m.httpRequestMetrics)
+		if err == nil {
+			return
+		}
+
+		var already prometheus.AlreadyRegisteredError
+		if errors.As(err, &already) {
+			if existing, ok := already.ExistingCollector.(*prometheus.HistogramVec); ok {
+				m.httpRequestMetrics = existing
+
+				return
+			}
+		}
+
+		panic(err)
 	})
 }
 

@@ -191,6 +191,27 @@ SENTRY_DSN=
 | `SERVER_IDLE_TIMEOUT_SEC` | 60 | простой keep-alive соединения между запросами |
 
 Долгие ответы (выгрузки, стриминг) обрываются по `SERVER_WRITE_TIMEOUT_SEC` — для них увеличьте его или задайте `-1`.
+Для отдельного маршрута — без смены настроек всего сервера:
+
+```go
+api := router.Group("/api/v1")
+api.GET("/events/:id", gin2.WriteDeadline(30*time.Minute), handler)   // свой срок записи (0 — без срока)
+gin2.WithoutHandlerTimeout(http.MethodGet, "/api/v1/events/:id")       // без HANDLER_TIMEOUT: полный путь с префиксом группы
+```
+
+Путь в `WithoutHandlerTimeout` — полный шаблон с префиксом групп, как в `router.Routes()`; пути, которого нет в роутере,
+`HttpKernel` при старте пишет WARN. `WriteDeadline` под `HANDLER_TIMEOUT` не действует (ответ буферизуется) — маршрут
+исключают `WithoutHandlerTimeout`, иначе в лог пишется предупреждение.
+
+Прочие настройки (все необязательные; не заданы — поведение прежнее):
+
+| Переменная | Что задаёт |
+|---|---|
+| `SENSITIVE_KEYS` | дополнительные чувствительные ключи query и заголовков через запятую: их значения маскируются в Sentry и в debug-логе. Без неё маскируются `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `password`, `token`, `access_token`, `refresh_token`, `id_token`, `client_secret`, `code` и `state` (OIDC), ключи с окончанием `-token`/`_token`/`-secret`/`_secret`/`-key`/`_key` (кроме `Idempotency-Key`) и с `password`/`apikey`/`api_key`/`api-key` в имени |
+| `SENSITIVE_KEYS_ALLOW` | ключи через запятую, которые не маскируются, даже если подходят под правила выше (например, `state`, если он не секрет) |
+| `VALIDATION_KEYS` | `json` — ключи ошибок 422 по тегу источника (тело — `json`, query — `form`, путь — `uri`, затем остальные) и полный путь вложенного поля (`items[2].component_ids`); не задана — последнее имя Go-поля в snake_case (`ComponentIDs` → `component_i_ds`) |
+| `METRICS_ENABLED` | `false`/`0` — без метрик `ginHelpers_*` и маршрута `/metrics` (если `/metrics` не должен быть на публичном адресе); не задана — включены |
+| `METRICS_URL_LABEL` | `route` — метка `url` метрик `ginHelpers_*` по шаблону маршрута (`/items/:id`), число серий не растёт с id; не задана — путь запроса |
 
 CORS (`middleware.CorsMiddleware`) — выключен, пока `CORS_ALLOWED_ORIGINS` пуст:
 
@@ -260,6 +281,9 @@ response.InternalServerError(c, err, ctx)
 ```
 
 Ошибки оборачиваются аналогично — `{"success": false, "data": {"status", "error", "message", "request_id", "hostname", "details"}}`.
+
+Ответ без тела (вебхук, back-channel logout, 204) — `response.NoContent(c, status)` (`0` — 204). Если хендлер сам
+записал тело (файл, текст, `c.JSON`), `Formatted` его не трогает и конверт не дописывает.
 
 ### Raw-ответы (без конверта `success/data`)
 

@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.7.0
+
+Исправления безопасности и порчи ответов, новые необязательные настройки. Обратно совместимо: сигнатуры не изменились,
+без новых переменных поведение для клиентов прежнее.
+
+### Исправлено
+- `LoggerMiddleware` читал тело каждого запроса и подменял его первыми 1 МиБ: обработчик получал обрезанное тело
+  больше 1 МиБ. Теперь тело читается только при уровне логов debug (в лог — до 1 МиБ), обработчик получает его целиком.
+- `response.Formatted` дописывал JSON-конверт к телу, которое хендлер записал сам (файл, текст, `c.JSON`): ответ
+  портился. Теперь записанное тело не трогается.
+- Секреты в Sentry и debug-логе: маскировались только `Authorization`, `Cookie`, `token`, `access_token`. Теперь
+  ещё `Proxy-Authorization`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `password`, `refresh_token`, `id_token`,
+  `client_secret`, `code`, `state` (OAuth/OIDC), ключи с окончанием `-token`/`_token`/`-secret`/`_secret`/`-key`/`_key`
+  (кроме `Idempotency-Key`) и с `password`/`apikey` в имени; `SENSITIVE_KEYS` добавляет ключи, `SENSITIVE_KEYS_ALLOW` —
+  снимает маскирование.
+- `metrics.NewCollector` второй раз в процессе (второе приложение, тесты) падал с паникой регистрации: теперь берётся
+  уже зарегистрированная гистограмма.
+
+### Добавлено
+- `response.NoContent(c, status)` — ответ без тела (204 по умолчанию) через `FormattedResponseMiddleware`.
+- `gin.WithoutHandlerTimeout(method, path)` — маршрут без `HANDLER_TIMEOUT` (потоки, большие файлы; путь — полный
+  шаблон с префиксом групп); `gin.CheckTimeoutExemptions(router)` — WARN о пути, которого нет в роутере (вызывает
+  `HttpKernel.Start`); `gin.WriteDeadline(d)` — свой срок записи ответа маршрута.
+- `gin.IsSensitiveKey`, `gin.MaskHeaders`, `gin.MaskQuery` — общий список чувствительных ключей; env `SENSITIVE_KEYS`.
+- env `VALIDATION_KEYS=json` — ключи ошибок 422 по тегу источника (тело — `json`, query — `form`, путь — `uri`) и полный путь вложенного поля
+  (`items[2].component_ids`); без неё ключи прежние (`component_i_ds`).
+- env `METRICS_ENABLED=false` — без метрик `ginHelpers_*` и `/metrics`; env `METRICS_URL_LABEL=route` — метка `url`
+  по шаблону маршрута.
+
 ## v1.6.1
 
 Обрыв запроса клиентом под `HANDLER_TIMEOUT` больше не считается таймаутом. Сигнатуры не изменились, ответ по
