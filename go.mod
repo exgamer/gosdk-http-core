@@ -3,7 +3,7 @@ module github.com/exgamer/gosdk-http-core
 go 1.27.3
 
 require (
-	github.com/exgamer/gosdk-core v1.1.0
+	github.com/exgamer/gosdk-core v1.2.0
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-errors/errors v1.5.1
 	github.com/go-playground/validator/v10 v10.30.5
