@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -169,13 +170,22 @@ func logPanic(c *gin.Context, goErr *errors.Error) {
 	httpLogger.FormattedError(ctx, method, path, c.Writer.Status(), requestID, message)
 }
 
+// requestIdPattern Допустимый входящий Request-Id: UUID, ULID, hex trace id, base64 — до 128 символов.
+var requestIdPattern = regexp.MustCompile(`^[A-Za-z0-9._:/+=-]{1,128}$`)
+
+// IsValidRequestId Входящий Request-Id принимается как есть; иначе сервис генерирует свой.
+func IsValidRequestId(id string) bool {
+	return requestIdPattern.MatchString(id)
+}
+
 func GetInstanceHttpInfo(c *gin.Context) *config.HttpInfo {
 	httpInfo := &config.HttpInfo{}
 	httpInfo.RequestId = c.GetHeader(constants.RequestIdHeaderName)
-	// если request id не пришел с заголовком, генерим его, чтобы прокидывать дальше при http запросах
-	if httpInfo.RequestId == "" {
+	// request id не пришел или не по формату (мусор, переносы строк, слишком длинный) — генерим свой:
+	// он уходит в логи, ответы и исходящие запросы
+	if !IsValidRequestId(httpInfo.RequestId) {
 		httpInfo.GenerateRequestId()
-		c.Request.Header.Add(constants.RequestIdHeaderName, httpInfo.RequestId)
+		c.Request.Header.Set(constants.RequestIdHeaderName, httpInfo.RequestId)
 	}
 
 	httpInfo.LanguageCode = c.GetHeader(constants.LanguageHeaderName)

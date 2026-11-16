@@ -249,6 +249,10 @@ router.GET("/health", func(c *gin.Context) {
 })
 ```
 
+`RequestInfoMiddleware` берёт входящий `Request-Id` (он уходит в логи, ответы и исходящие запросы), только если это
+1–128 символов `A-Z a-z 0-9 . _ : / + = -` (UUID, ULID, hex trace id, base64); пустой или другой — заменяется
+сгенерированным UUID, в том числе в заголовке запроса (с v1.8.0; раньше принимался любой).
+
 ---
 
 ## 📤 Формат ответа: `{success, data}` и raw-ответы
@@ -284,6 +288,12 @@ response.InternalServerError(c, err, ctx)
 
 Ответ без тела (вебхук, back-channel logout, 204) — `response.NoContent(c, status)` (`0` — 204). Если хендлер сам
 записал тело (файл, текст, `c.JSON`), `Formatted` его не трогает и конверт не дописывает.
+
+Своё middleware (авторизация, лимиты) прерывает запрос через `response.ErrorResponse(c, err)` или `response.*`
+и затем `c.Abort()` — тогда клиент получает ошибку SDK с нужным статусом. Прерванный запрос без ответа в контексте
+(с v1.8.0): `c.AbortWithStatus(4xx/5xx)` — тело ошибки SDK с этим статусом, `c.AbortWithStatus(<400)` (CORS preflight
+204) — как есть, голый `c.Abort()` — 500 и ERROR в логе «request aborted without response». До v1.8.0 такой запрос
+получал `{"success": true, "data": null}` (голый `c.Abort()` — ещё и со статусом 200).
 
 ### Raw-ответы (без конверта `success/data`)
 

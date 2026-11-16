@@ -81,6 +81,12 @@ var loggerCases = []loggerCase{
 		tag:    "[ERROR]",
 	},
 	{
+		name:    "bare abort without response",
+		handler: func(c *gin.Context) { c.Abort() },
+		status:  http.StatusInternalServerError,
+		tag:     "[ERROR]",
+	},
+	{
 		name:    "success",
 		handler: func(c *gin.Context) { c.Status(http.StatusOK) },
 		status:  http.StatusOK,
@@ -174,5 +180,17 @@ func assertRequestLine(t *testing.T, out string, tag string, visible bool) {
 
 	if !visible && out != "" {
 		t.Fatalf("want no log output, got %q", out)
+	}
+}
+
+// A bare c.Abort() without a response: 500, the ERROR line names the cause.
+func TestLoggerMiddleware_BareAbortNamesCause(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	out := captureLog(t, corelogger.LevelInfo)
+
+	serve(func(c *gin.Context) { c.Abort() })
+
+	if !strings.Contains(out.String(), "request aborted without response") {
+		t.Fatalf("want the cause in the log, got %q", out.String())
 	}
 }

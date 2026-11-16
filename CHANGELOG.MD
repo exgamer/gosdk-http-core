@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.8.0
+
+Меняется ответ на прерванный запрос без ответа и приём входящего `Request-Id`. Сигнатуры не изменились; сервисы,
+которые прерывают запрос через `response.ErrorResponse`/`response.*`, работают как раньше.
+
+### Исправлено
+- `response.Formatted` (`FormattedResponseMiddleware`) отвечал `{"success": true, "data": null}` на запрос, прерванный
+  без ответа в контексте: голый `c.Abort()` — со статусом 200, `c.AbortWithStatus(401)` — 401 с телом успеха. Теперь
+  `AbortWithStatus(4xx/5xx)` — тело ошибки SDK с этим статусом, голый `c.Abort()` — 500 и ERROR в логе «request
+  aborted without response» (`response.ErrAbortedWithoutResponse`), `AbortWithStatus(<400)` (CORS preflight 204) —
+  без тела, как есть. Лог и Sentry по таким запросам — как раньше.
+- Входящий `Request-Id` принимался любым и попадал в логи, ответы и исходящие запросы. Теперь принимается только
+  1–128 символов `[A-Za-z0-9._:/+=-]` (UUID, ULID, hex trace id, base64), иначе — сгенерированный UUID, в том числе
+  в заголовке запроса.
+
+### Добавлено
+- `gin.IsValidRequestId(id)` — проверка формата входящего `Request-Id`.
+
 ## v1.7.1
 
 Зависимость `gosdk-core` поднята до v1.2.0. API пакета не изменился.

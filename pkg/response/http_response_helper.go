@@ -167,6 +167,26 @@ func Formatted(c *gin.Context) {
 		return
 	}
 
+	// Запрос прерван (c.Abort, c.AbortWithStatus), а ответа в контексте нет — не успех.
+	// Исключение в контекст не кладётся: лог и Sentry — как раньше (LoggerMiddleware — по статусу и c.Errors).
+	if c.IsAborted() && !hasAnswer(c) {
+		status := http.StatusInternalServerError
+		if c.Writer.Written() {
+			status = c.Writer.Status()
+			// Middleware ответил сам статусом без тела (CORS preflight 204) — как есть.
+			if status < http.StatusBadRequest {
+				return
+			}
+		} else {
+			// Голый c.Abort() — ошибка сервиса: 500, причина — в лог (LoggerMiddleware пишет c.Errors).
+			_ = c.Error(ErrAbortedWithoutResponse)
+		}
+
+		writeError(c, exception.NewUntrackableHttpException(status, errors.New(http.StatusText(status)), nil))
+
+		return
+	}
+
 	// ---- ERROR PATH ----
 	if exObj, exists := c.Get(ctxKeyException); exists {
 		err, ok := exObj.(error)
@@ -179,33 +199,7 @@ func Formatted(c *gin.Context) {
 			httpEx = exception.NewInternalServerErrorException(err, nil)
 		}
 
-		serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
-		requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
-
-		if appInfo := context.GetAppInfoFromContext(c.Request.Context()); appInfo != nil {
-			serviceName = appInfo.ServiceName
-		}
-
-		if httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context()); httpInfo != nil {
-			requestId = httpInfo.RequestId
-		}
-
-		responseData := gin.H{
-			"status":     httpEx.Code,
-			"error":      httpEx.GetErrorType(),
-			"message":    httpEx.Error(),
-			"request_id": requestId,
-			"hostname":   serviceName,
-			"details":    httpEx.Context,
-		}
-
-		if isRaw(c) {
-			writeJSON(c, httpEx.Code, responseData)
-
-			return
-		}
-
-		writeJSON(c, httpEx.Code, wrapWithDebug(c, false, responseData))
+		writeError(c, httpEx)
 
 		return
 	}
@@ -234,6 +228,51 @@ func Formatted(c *gin.Context) {
 	}
 
 	writeJSON(c, status, wrapWithDebug(c, true, data))
+}
+
+// writeError Тело ошибки SDK (status, error, message, request_id, hostname, details) со статусом исключения.
+func writeError(c *gin.Context, httpEx *exception.HttpException) {
+	serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
+	requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
+
+	if appInfo := context.GetAppInfoFromContext(c.Request.Context()); appInfo != nil {
+		serviceName = appInfo.ServiceName
+	}
+
+	if httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context()); httpInfo != nil {
+		requestId = httpInfo.RequestId
+	}
+
+	responseData := gin.H{
+		"status":     httpEx.Code,
+		"error":      httpEx.GetErrorType(),
+		"message":    httpEx.Error(),
+		"request_id": requestId,
+		"hostname":   serviceName,
+		"details":    httpEx.Context,
+	}
+
+	if isRaw(c) {
+		writeJSON(c, httpEx.Code, responseData)
+
+		return
+	}
+
+	writeJSON(c, httpEx.Code, wrapWithDebug(c, false, responseData))
+}
+
+// ErrAbortedWithoutResponse Запрос прерван c.Abort() без ответа (response.* или ErrorResponse): FormattedResponseMiddleware отвечает 500.
+var ErrAbortedWithoutResponse = errors.New("request aborted without response")
+
+// hasAnswer В контексте есть ответ: ошибка, данные, статус или NoContent.
+func hasAnswer(c *gin.Context) bool {
+	for _, key := range []string{ctxKeyException, ctxKeyData, ctxKeyStatusCode, ctxKeyNoBody} {
+		if _, ok := c.Get(key); ok {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isRaw(c *gin.Context) bool {
