@@ -165,6 +165,17 @@ func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 			return false
 		}
 
+		// Ошибка собственного UnmarshalJSON поля — ключ по пути поля, как у ошибки типа
+		var unmarshalerErr *unmarshalerFieldError
+
+		if errors.As(err, &unmarshalerErr) {
+			out := map[string]any{typeErrorKey(unmarshalerErr.Field): unmarshalerErr.Err.Error()}
+
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnprocessableEntity, errors.New("validation error"), out)
+
+			return false
+		}
+
 		// Обработка ошибок syntax
 		var syntaxTypeError *json.SyntaxError
 

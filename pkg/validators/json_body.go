@@ -15,7 +15,8 @@ var errTrailingData = errors.New("request body has data after the JSON value")
 
 // jsonOneValueBinding Привязка JSON-тела в ValidateRequestBody: как binding.JSON (тот же декодер gin, UseNumber,
 // валидация), но данные после первого JSON-значения — ошибка (422 «incorrect request body»), а не молча отброшенный
-// хвост: `{"a":1}{"a":2}` и `{"a":1}garbage` раньше проходили по первому объекту. Пробелы в конце — как раньше
+// хвост: `{"a":1}{"a":2}` и `{"a":1}garbage` раньше проходили по первому объекту. Пробелы в конце — как раньше.
+// Ошибка собственного UnmarshalJSON поля — unmarshalerFieldError с путём поля (ответ 422 с ключом поля)
 type jsonOneValueBinding struct{}
 
 func (jsonOneValueBinding) Name() string {
@@ -33,7 +34,7 @@ func (jsonOneValueBinding) Bind(req *http.Request, obj any) error {
 	}
 
 	if err := binding.JSON.BindBody(body, obj); err != nil {
-		return err
+		return withUnmarshalerField(body, obj, err)
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(body))
