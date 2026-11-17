@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.9.0
+
+Меняется CORS при `CORS_ALLOWED_ORIGINS=*` и разбор JSON-тела с данными после объекта. Сигнатуры и переменные
+окружения не изменились; с явным списком origins ответ CORS прежний.
+
+### Исправлено
+- CORS при `CORS_ALLOWED_ORIGINS=*` отражал любой Origin вместе с `Access-Control-Allow-Credentials: true`: любой сайт
+  мог делать запросы с cookie пользователя и читать ответ. Теперь при `*` Origin отражается (`Vary: Origin`) без
+  `Access-Control-Allow-Credentials`; cookie и credentials — только для origins из явного списка. Origin `null` с
+  credentials не разрешается, в том числе из явного списка. Запросы с `Authorization: Bearer` работают как раньше.
+- `ValidateRequestBody` принимал JSON-тело с данными после первого значения (`{"a":1}{"a":2}`, `{"a":1}garbage`) по
+  первому объекту. Теперь такое тело — 422 `incorrect request body`. Пробелы в конце, неизвестные поля, ошибки типов и
+  правил — как раньше.
+
 ## v1.8.0
 
 Меняется ответ на прерванный запрос без ответа и приём входящего `Request-Id`. Сигнатуры не изменились; сервисы,

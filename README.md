@@ -217,7 +217,7 @@ CORS (`middleware.CorsMiddleware`) — выключен, пока `CORS_ALLOWED_
 
 | Переменная | Что задаёт |
 |---|---|
-| `CORS_ALLOWED_ORIGINS` | разрешённые origins через запятую; `*` — любой origin (вместе с `Access-Control-Allow-Credentials: true` — не для сервисов с cookie-сессией) |
+| `CORS_ALLOWED_ORIGINS` | разрешённые origins через запятую — отражаются с `Access-Control-Allow-Credentials: true`; `*` — любой origin, с v1.9.0 без `Access-Control-Allow-Credentials` (cookie и credentials — только для явного списка). Origin `null` с credentials не разрешается |
 | `CORS_EXTRA_ALLOWED_HEADERS` | дополнительные заголовки для `Access-Control-Allow-Headers` через запятую, например `X-CSRF-Token`; добавляются к базовому списку `Origin, Content-Type, Accept, Authorization, X-Request-Id`, повторы и пустые элементы пропускаются; не задана — ответ прежний |
 
 ---

@@ -117,3 +117,79 @@ func TestCorsAllowedHeaders(t *testing.T) {
 		})
 	}
 }
+
+// Явный список: origin отражается с credentials, как раньше.
+func TestCors_ExplicitList_CredentialsAsBefore(t *testing.T) {
+	r := corsTestRouter(&config.HttpConfig{CorsAllowedOrigins: "https://other.example.com, " + corsTestOrigin})
+
+	w := corsTestDo(r, http.MethodGet, corsTestOrigin)
+
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != corsTestOrigin {
+		t.Errorf("Allow-Origin = %q, want %q", got, corsTestOrigin)
+	}
+
+	if got := w.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+		t.Errorf("Allow-Credentials = %q, want true", got)
+	}
+
+	if got := w.Header().Get("Vary"); got != "Origin" {
+		t.Errorf("Vary = %q, want Origin", got)
+	}
+}
+
+// "*": origin отражается, Allow-Credentials нет, остальные заголовки прежние.
+func TestCors_AnyOrigin_NoCredentials(t *testing.T) {
+	r := corsTestRouter(&config.HttpConfig{CorsAllowedOrigins: "*"})
+
+	w := corsTestDo(r, http.MethodOptions, corsTestOrigin)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", w.Code)
+	}
+
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != corsTestOrigin {
+		t.Errorf("Allow-Origin = %q, want %q", got, corsTestOrigin)
+	}
+
+	if got := w.Header().Get("Vary"); got != "Origin" {
+		t.Errorf("Vary = %q, want Origin", got)
+	}
+
+	if got, ok := w.Header()["Access-Control-Allow-Credentials"]; ok {
+		t.Errorf("Allow-Credentials = %q, want absent", got)
+	}
+
+	if got := w.Header().Get("Access-Control-Allow-Methods"); got != "GET, POST, PUT, PATCH, DELETE, OPTIONS" {
+		t.Errorf("Allow-Methods = %q", got)
+	}
+
+	if got := w.Header().Get("Access-Control-Max-Age"); got != "86400" {
+		t.Errorf("Max-Age = %q", got)
+	}
+}
+
+// Origin "null" с credentials не разрешается никогда; при "*" без credentials — отражается.
+func TestCors_NullOrigin(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  *config.HttpConfig
+		want string
+	}{
+		{"any origin without credentials", &config.HttpConfig{CorsAllowedOrigins: "*"}, "null"},
+		{"explicit list with null", &config.HttpConfig{CorsAllowedOrigins: corsTestOrigin + ",null"}, ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := corsTestDo(corsTestRouter(tc.cfg), http.MethodGet, "null")
+
+			if got := w.Header().Get("Access-Control-Allow-Origin"); got != tc.want {
+				t.Errorf("Allow-Origin = %q, want %q", got, tc.want)
+			}
+
+			if got := w.Header().Get("Access-Control-Allow-Credentials"); got != "" {
+				t.Errorf("Allow-Credentials = %q, want absent", got)
+			}
+		})
+	}
+}

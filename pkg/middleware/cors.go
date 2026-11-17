@@ -16,7 +16,8 @@ var corsBaseAllowedHeaders = []string{"Origin", "Content-Type", "Accept", "Autho
 
 // CorsMiddleware разрешает cross-origin запросы.
 // Origins берутся из env CORS_ALLOWED_ORIGINS (список через запятую).
-// Значение "*" разрешает все origins.
+// Значение "*" разрешает все origins без Access-Control-Allow-Credentials (с ним любой сайт делал бы запросы с cookie
+// пользователя); cookie и credentials — только для origins из явного списка. Origin "null" с credentials не разрешается.
 // Дополнительные разрешённые заголовки — env CORS_EXTRA_ALLOWED_HEADERS (список через запятую).
 func CorsMiddleware(a *app.App) gin.HandlerFunc {
 	httpConfig, _ := di2.GetHttpConfig(a.Container)
@@ -58,10 +59,20 @@ func corsHandler(httpConfig *config.HttpConfig) gin.HandlerFunc {
 			return
 		}
 
+		credentials := raw != "*"
+		if credentials && httpInfo.RequestOrigin == "null" {
+			c.Next()
+
+			return
+		}
+
 		c.Header("Access-Control-Allow-Origin", httpInfo.RequestOrigin)
 		c.Header("Vary", "Origin")
 
-		c.Header("Access-Control-Allow-Credentials", "true")
+		if credentials {
+			c.Header("Access-Control-Allow-Credentials", "true")
+		}
+
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", allowHeaders)
 		c.Header("Access-Control-Max-Age", "86400")

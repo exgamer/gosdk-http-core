@@ -127,6 +127,9 @@ func pathValues(params gin.Params) url.Values {
 // ValidateRequestBody - Валидация тела HTTP реквеста
 func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
 	bodyBinding := binding.Default(c.Request.Method, c.ContentType())
+	if bodyBinding == binding.JSON {
+		bodyBinding = jsonOneValueBinding{}
+	}
 
 	err := bindWithCustomRules(c, request, bodyBinding)
 	if err != nil {
