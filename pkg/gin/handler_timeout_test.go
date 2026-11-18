@@ -3,6 +3,7 @@ package gin
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -21,8 +22,7 @@ import (
 )
 
 const (
-	wantTimeoutBody        = `{"code": -1, "msg":"http: Handler timeout"}`
-	wantTimeoutContentType = "text/plain; charset=utf-8"
+	wantTimeoutContentType = "application/json"
 	wantStreamContentType  = "text/event-stream;charset=utf-8"
 	fastRequests           = 20
 )
@@ -111,8 +111,8 @@ func TestInitRouter_TimeoutAnswerReachesClientAtDeadline(t *testing.T) {
 		t.Errorf("GET /slow answered in %v, want about 1s (HandlerTimeout), not after the handler", elapsed)
 	}
 
-	if code != http.StatusServiceUnavailable || body != wantTimeoutBody || header.Get("Content-Type") != wantTimeoutContentType {
-		t.Errorf("GET /slow = %d %q %q, want 503 %s %s", code, header.Get("Content-Type"), body, wantTimeoutContentType, wantTimeoutBody)
+	if code != http.StatusServiceUnavailable || !isTimeoutBody(body) || header.Get("Content-Type") != wantTimeoutContentType {
+		t.Errorf("GET /slow = %d %q %q, want 503 %s SDK error body", code, header.Get("Content-Type"), body, wantTimeoutContentType)
 	}
 
 	start = time.Now()
@@ -589,8 +589,8 @@ func assertFastRequests(t *testing.T, r *gin.Engine) {
 func assertTimeoutAnswer(t *testing.T, w *httptest.ResponseRecorder, what string) {
 	t.Helper()
 
-	if w.Code != http.StatusServiceUnavailable || w.Body.String() != wantTimeoutBody {
-		t.Errorf("%s = %d %q, want 503 %s", what, w.Code, w.Body.String(), wantTimeoutBody)
+	if w.Code != http.StatusServiceUnavailable || !isTimeoutBody(w.Body.String()) {
+		t.Errorf("%s = %d %q, want 503 SDK error body", what, w.Code, w.Body.String())
 	}
 
 	if ct := w.Header().Get("Content-Type"); ct != wantTimeoutContentType {
@@ -600,6 +600,28 @@ func assertTimeoutAnswer(t *testing.T, w *httptest.ResponseRecorder, what string
 	if w.Header().Get("X-Late") != "" {
 		t.Errorf("%s: header X-Late set after the deadline reached the client", what)
 	}
+}
+
+// isTimeoutBody The timeout answer is the SDK error body: success false, status 503, status text, no details.
+func isTimeoutBody(body string) bool {
+	var got struct {
+		Success *bool `json:"success"`
+		Data    struct {
+			Status        int    `json:"status"`
+			Error         string `json:"error"`
+			Message       string `json:"message"`
+			CorrelationID string `json:"correlation_id"`
+			Details       any    `json:"details"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal([]byte(body), &got); err != nil {
+		return false
+	}
+
+	return got.Success != nil && !*got.Success && got.Data.Status == http.StatusServiceUnavailable &&
+		got.Data.Error == "service_unavailable" && got.Data.Message == "Service Unavailable" &&
+		got.Data.CorrelationID != "" && got.Data.Details == nil
 }
 
 // signalRecorder closes written on the first body write: the answer is sent while ServeHTTP may still run.

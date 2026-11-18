@@ -21,9 +21,9 @@ func TestRequestInfoMiddleware_HttpInfoInRequestContext(t *testing.T) {
 		t.Fatal("GetHttpInfoFromContext = nil, want HttpInfo put by RequestInfoMiddleware")
 	}
 
-	if info.RequestId != "rid-80" || info.RequestUrl != "/x" || info.RequestMethod != http.MethodGet {
-		t.Errorf("HttpInfo = {RequestId: %q, RequestUrl: %q, RequestMethod: %q}, want {rid-80, /x, GET}",
-			info.RequestId, info.RequestUrl, info.RequestMethod)
+	if info.CorrelationId != "rid-80" || info.RequestUrl != "/x" || info.RequestMethod != http.MethodGet {
+		t.Errorf("HttpInfo = {CorrelationId: %q, RequestUrl: %q, RequestMethod: %q}, want {rid-80, /x, GET}",
+			info.CorrelationId, info.RequestUrl, info.RequestMethod)
 	}
 }
 
@@ -56,7 +56,7 @@ func requestInfoContext(t *testing.T, requestID string) context.Context {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
-	req.Header.Set(constants.RequestIdHeaderName, requestID)
+	req.Header.Set(constants.CorrelationIdHeaderName, requestID)
 	engine.ServeHTTP(httptest.NewRecorder(), req)
 
 	if ctx == nil {

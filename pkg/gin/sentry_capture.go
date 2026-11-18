@@ -42,7 +42,7 @@ func captureToSentry(c *gin.Context, err error, status int) {
 
 	httpInfo := GetHttpInfoFromContext(c.Request.Context())
 	if httpInfo != nil {
-		requestId = httpInfo.RequestId
+		requestId = httpInfo.CorrelationId
 	}
 
 	if status == 0 {
@@ -60,13 +60,13 @@ func captureToSentry(c *gin.Context, err error, status int) {
 	endpoint := c.Request.Method + " " + route
 
 	responseData := map[string]any{
-		"status":     status,
-		"error":      httpEx.GetErrorType(),
-		"message":    httpEx.Error(),
-		"request_id": requestId,
-		"hostname":   serviceName,
-		"endpoint":   endpoint,
-		"details":    httpEx.Context,
+		"status":         status,
+		"error":          httpEx.GetErrorType(),
+		"message":        httpEx.Error(),
+		"correlation_id": requestId,
+		"hostname":       serviceName,
+		"endpoint":       endpoint,
+		"details":        httpEx.Context,
 	}
 
 	// Чувствительные заголовки и параметры (IsSensitiveKey: Authorization, Cookie, code, state, *token*, *secret*…,

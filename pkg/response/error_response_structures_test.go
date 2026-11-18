@@ -77,6 +77,15 @@ func TestErrorResponseStructuresMatchFormattedBody(t *testing.T) {
 			decodeStrict(t, body, dst)
 
 			success, status, message, details := tc.read(dst)
+			// 5xx без HTTP_ERROR_DETAILS: текст статуса, без details (текст ошибки — только в лог)
+			if tc.status >= http.StatusInternalServerError {
+				if success || status != tc.status || message != http.StatusText(tc.status) || details != nil {
+					t.Fatalf("5xx: success=%v status=%d message=%q details=%v, want status text without details", success, status, message, details)
+				}
+
+				return
+			}
+
 			if success || status != tc.status || message != "ошибка" || details["code"] != "some_code" {
 				t.Fatalf("поля не разобраны: success=%v status=%d message=%q details=%v", success, status, message, details)
 			}

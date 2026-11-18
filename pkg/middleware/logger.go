@@ -56,12 +56,12 @@ func LoggerMiddleware() gin.HandlerFunc {
 
 			// 4xx — ошибка клиента, warning; 5xx и прочее — error
 			if isClientError(httpEx.Code) && status < http.StatusInternalServerError {
-				logger.FormattedWarning(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, httpEx.Error())
+				logger.FormattedWarning(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.CorrelationId, httpEx.Error())
 
 				return
 			}
 
-			logger.FormattedError(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, httpEx.Error())
+			logger.FormattedError(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.CorrelationId, httpEx.Error())
 
 			return
 		}
@@ -73,7 +73,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 				msg = "server error"
 			}
 
-			logger.FormattedError(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, msg)
+			logger.FormattedError(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.CorrelationId, msg)
 
 			return
 		}
@@ -83,17 +83,17 @@ func LoggerMiddleware() gin.HandlerFunc {
 		if logger2.IsDebugLevel() {
 			messageBuilder.WriteString("headers: " + headersToJSON(headers) + "; ")
 			messageBuilder.WriteString("query: " + queryToJSON(queryParams) + "; ")
-			messageBuilder.WriteString("request_body: " + bodyToPrettyJSON(requestBody) + "; ")
+			messageBuilder.WriteString("request_body: " + bodyForLog(requestBody, req.Header.Get("Content-Type")) + "; ")
 		}
 		messageBuilder.WriteString("Exec time:" + latency.String())
 
 		if isClientError(status) {
-			logger.FormattedWarning(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, messageBuilder.String())
+			logger.FormattedWarning(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.CorrelationId, messageBuilder.String())
 
 			return
 		}
 
-		logger.FormattedInfo(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.RequestId, messageBuilder.String())
+		logger.FormattedInfo(c.Request.Context(), httpInfo.RequestMethod, httpInfo.RequestUrl, status, httpInfo.CorrelationId, messageBuilder.String())
 	}
 }
 
@@ -134,16 +134,40 @@ func queryToJSON(q url.Values) string {
 	return string(b)
 }
 
-func bodyToPrettyJSON(body []byte) string {
+// bodyForLog Тело запроса для debug-лога без секретов: JSON — с отступами, значения чувствительных ключей
+// (gin.IsSensitiveKey) на любой глубине — «***»; форма — то же по параметрам; multipart и JSON, который не
+// разбирается (обрезан по logBodyLimit, битый), — только размер: сырой текст мог бы унести секрет; прочее — строкой.
+func bodyForLog(body []byte, contentType string) string {
 	if len(body) == 0 {
 		return "{}"
 	}
 
-	var out bytes.Buffer
-	if err := json.Indent(&out, body, "", "  "); err != nil {
-		// если тело не JSON — просто строкой
-		return string(body)
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "multipart/") {
+		return fmt.Sprintf("<multipart body, %d bytes>", len(body))
 	}
 
-	return out.String()
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') {
+		decoder := json.NewDecoder(bytes.NewReader(trimmed))
+		decoder.UseNumber()
+
+		var v any
+		if err := decoder.Decode(&v); err != nil {
+			return fmt.Sprintf("<unparsed JSON body, %d bytes>", len(body))
+		}
+
+		var out bytes.Buffer
+
+		encoder := json.NewEncoder(&out)
+		encoder.SetEscapeHTML(false)
+		encoder.SetIndent("", "  ")
+
+		if err := encoder.Encode(gin2.MaskJSONKeys(v, "***")); err != nil {
+			return fmt.Sprintf("<unparsed JSON body, %d bytes>", len(body))
+		}
+
+		return strings.TrimSuffix(out.String(), "\n")
+	}
+
+	return gin2.MaskBodyString(string(body), "***")
 }

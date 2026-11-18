@@ -17,7 +17,7 @@ func TestHttpInfoContext_WithHttpInfoReturnsTheSamePointer(t *testing.T) {
 
 // A value put under the string key "http_info" must not pass for HttpInfo.
 func TestHttpInfoContext_StringKeyIsIgnored(t *testing.T) {
-	spoof := &config.HttpInfo{RequestId: "spoof"}
+	spoof := &config.HttpInfo{CorrelationId: "spoof"}
 	ctx := context.WithValue(context.Background(), "http_info", spoof) //nolint:staticcheck // SA1029: проверяем, что строковый ключ не подменяет HttpInfo
 
 	if got := GetHttpInfoFromContext(ctx); got != nil {
@@ -26,9 +26,9 @@ func TestHttpInfoContext_StringKeyIsIgnored(t *testing.T) {
 }
 
 func TestHttpInfoContext_StringKeyDoesNotShadowTheOwnKey(t *testing.T) {
-	own := &config.HttpInfo{RequestId: "own"}
+	own := &config.HttpInfo{CorrelationId: "own"}
 	ctx := WithHttpInfo(context.Background(), own)
-	ctx = context.WithValue(ctx, "http_info", &config.HttpInfo{RequestId: "spoof"}) //nolint:staticcheck // SA1029: проверяем, что строковый ключ не подменяет HttpInfo
+	ctx = context.WithValue(ctx, "http_info", &config.HttpInfo{CorrelationId: "spoof"}) //nolint:staticcheck // SA1029: проверяем, что строковый ключ не подменяет HttpInfo
 
 	if got := GetHttpInfoFromContext(ctx); got != own {
 		t.Errorf("GetHttpInfoFromContext = %+v, want the value put by WithHttpInfo", got)

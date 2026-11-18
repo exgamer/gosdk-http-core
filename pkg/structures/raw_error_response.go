@@ -4,7 +4,7 @@ package structures
 // (ErrorResponseRaw, ErrorResponseWithStatusRaw, BadRequestRaw и подобные), для Swagger
 type RawErrorResponse struct {
 	Status    int            `json:"status"`
-	RequestId string         `json:"request_id"`
+	RequestId string         `json:"correlation_id"`
 	Error     string         `json:"error"`
 	Message   string         `json:"message"`
 	Hostname  string         `json:"hostname"`

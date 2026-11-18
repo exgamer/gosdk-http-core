@@ -27,7 +27,7 @@ import (
 
 // Timeout answer of handlerTimeout (pkg/gin) as the client sees it.
 const (
-	reportTimeoutBody   = `{"code": -1, "msg":"http: Handler timeout"}`
+	reportTimeoutBody   = `"message":"Service Unavailable"`
 	reportPanicMessage  = `"message":"internal server error"`
 	reportDeadlineLimit = 5 * time.Second // HANDLER_TIMEOUT is 1s; the limit only stops a broken test
 	reportForgedLine    = "2026-10-22 00:00:00.000 [INFO] fake"
@@ -119,12 +119,12 @@ func TestHandlerTimeoutReport_ClientCancelIsWarning(t *testing.T) {
 			}()
 
 			req := httptest.NewRequest(http.MethodGet, "/slow", nil).WithContext(ctx)
-			req.Header.Set(constants.RequestIdHeaderName, "rid-report")
+			req.Header.Set(constants.CorrelationIdHeaderName, "rid-report")
 
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, req)
 
-			if w.Code != clientClosed || w.Body.String() == reportTimeoutBody {
+			if w.Code != clientClosed || strings.Contains(w.Body.String(), reportTimeoutBody) {
 				t.Errorf("answer = %d %q, want 499 without the timeout body", w.Code, w.Body.String())
 			}
 
@@ -294,7 +294,7 @@ func withReportReporter(t *testing.T) *reportReporter {
 // serveReport serves the request with the request id rid-report; withPanic asks reportCatchAllHandler to panic.
 func serveReport(r *gin.Engine, method, target string, withPanic bool) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(method, target, nil)
-	req.Header.Set(constants.RequestIdHeaderName, "rid-report")
+	req.Header.Set(constants.CorrelationIdHeaderName, "rid-report")
 
 	if withPanic {
 		req.Header.Set(reportPanicHeader, "1")
@@ -334,7 +334,7 @@ func reportLines(buf *bytes.Buffer) []string {
 func assertReportTimeoutAnswer(t *testing.T, w *httptest.ResponseRecorder) {
 	t.Helper()
 
-	if w.Code != http.StatusServiceUnavailable || w.Body.String() != reportTimeoutBody {
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), reportTimeoutBody) {
 		t.Errorf("answer = %d %q, want 503 %s", w.Code, w.Body.String(), reportTimeoutBody)
 	}
 }

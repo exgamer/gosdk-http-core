@@ -14,6 +14,6 @@
 - RawErrorResponse — тело ошибки без обёртки, ответы `response.*Raw` (любой статус)
 
 Ошибки (кроме ответа на панику) отдаются в общей обёртке `{"success": false, "data": {status, error, message,
-request_id, hostname, details}}`. `InternalServerResponse` — тело ответа на панику, для обычных 500 в Swagger —
+correlation_id, hostname, details}}`. `InternalServerResponse` — тело ответа на панику, для обычных 500 в Swagger —
 `InternalServerErrorResponse`. Ответы `response.*Raw` (`ErrorResponseRaw`, `BadRequestRaw` и т. п.) отдают то же тело
 `data` без обёртки — в Swagger `RawErrorResponse`.

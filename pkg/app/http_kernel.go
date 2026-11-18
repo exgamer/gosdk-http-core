@@ -63,7 +63,27 @@ func (m *HttpKernel) Init(a *app.App) error {
 
 	m.Server = newServer(m.HttpConfig, m.Router)
 
+	if msg := handlerTimeoutWarning(m.HttpConfig.HandlerTimeout, m.Server.WriteTimeout); msg != "" {
+		logger.Warning(a.GetContext(), msg)
+	}
+
 	return nil
+}
+
+// handlerTimeoutWarning Текст WARN, если HANDLER_TIMEOUT не меньше срока записи ответа сервера: сервер закроет
+// соединение раньше, чем клиент получит ответ таймаута 503. Пусто — всё в порядке или срок записи выключен.
+func handlerTimeoutWarning(handlerTimeoutSec int, writeTimeout time.Duration) string {
+	if handlerTimeoutSec <= 0 || writeTimeout <= 0 {
+		return ""
+	}
+
+	handler := time.Duration(handlerTimeoutSec) * time.Second
+	if handler < writeTimeout {
+		return ""
+	}
+
+	return fmt.Sprintf("HANDLER_TIMEOUT=%ds is not less than the server write timeout %s (SERVER_WRITE_TIMEOUT_SEC): "+
+		"the connection is closed before the handler timeout response 503; make HANDLER_TIMEOUT smaller", handlerTimeoutSec, writeTimeout)
 }
 
 func (m *HttpKernel) Start(a *app.App) error {

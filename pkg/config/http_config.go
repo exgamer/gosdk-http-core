@@ -15,7 +15,7 @@ type HttpConfig struct {
 	// не задана, false/0 и любое другое значение — Swagger выключен.
 	SwaggerEnabled string `mapstructure:"SWAGGER_ENABLED" json:"swagger_enabled"`
 
-	// ErrorDetails Полная ошибка (текст паники и стек) в ответе 500. Включают true/1 (без учёта регистра,
+	// ErrorDetails Полная ошибка (текст паники и стек, текст ошибки и details ответа 5xx) в ответе 500. Включают true/1 (без учёта регистра,
 	// пробелы по краям обрезаются); не задана, false/0 и любое другое значение — выключено. На проде не задавать.
 	ErrorDetails string `mapstructure:"HTTP_ERROR_DETAILS" json:"http_error_details"`
 
@@ -23,8 +23,9 @@ type HttpConfig struct {
 	// значение — включены (как раньше). Выключают, если /metrics не должен быть на публичном адресе сервиса.
 	MetricsEnabled string `mapstructure:"METRICS_ENABLED" json:"metrics_enabled"`
 
-	// MetricsURLLabel Метка url метрик ginHelpers_*: route — шаблон маршрута (c.FullPath(), «/items/:id»;
-	// несматченный — «unmatched»), число серий ограничено; не задана и любое другое значение — путь запроса, как раньше.
+	// MetricsURLLabel Метка url метрик ginHelpers_*: не задана и route — шаблон маршрута (c.FullPath(), «/items/:id»;
+	// несматченный — «unmatched»), число серий ограничено; path — путь запроса (как до v1.11.0); другое значение —
+	// шаблон маршрута и WARN при старте.
 	MetricsURLLabel string `mapstructure:"METRICS_URL_LABEL" json:"metrics_url_label"`
 
 	// Таймауты http.Server, секунды. 0 (не задано) — значение по умолчанию

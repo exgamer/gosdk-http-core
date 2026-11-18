@@ -44,7 +44,7 @@ func TestCors_NoExtraHeaders_SameAllowHeadersAsBefore(t *testing.T) {
 		t.Fatalf("status = %d, want 204", w.Code)
 	}
 
-	want := "Origin, Content-Type, Accept, Authorization, X-Request-Id"
+	want := "Origin, Content-Type, Accept, Authorization, X-Correlation-Id, X-Request-Id, Request-Id"
 	if got := w.Header().Get("Access-Control-Allow-Headers"); got != want {
 		t.Errorf("Allow-Headers = %q, want %q", got, want)
 	}
@@ -58,7 +58,7 @@ func TestCors_ExtraHeadersAppended(t *testing.T) {
 
 	w := corsTestDo(r, http.MethodOptions, corsTestOrigin)
 
-	want := "Origin, Content-Type, Accept, Authorization, X-Request-Id, X-CSRF-Token"
+	want := "Origin, Content-Type, Accept, Authorization, X-Correlation-Id, X-Request-Id, Request-Id, X-CSRF-Token"
 	if got := w.Header().Get("Access-Control-Allow-Headers"); got != want {
 		t.Errorf("Allow-Headers = %q, want %q", got, want)
 	}
@@ -94,7 +94,7 @@ func TestCors_ExtraHeadersIgnoredWhenOriginsEmpty(t *testing.T) {
 }
 
 func TestCorsAllowedHeaders(t *testing.T) {
-	base := "Origin, Content-Type, Accept, Authorization, X-Request-Id"
+	base := "Origin, Content-Type, Accept, Authorization, X-Correlation-Id, X-Request-Id, Request-Id"
 
 	cases := []struct {
 		name  string

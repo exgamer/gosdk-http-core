@@ -6,7 +6,7 @@ type NotFoundErrorResponse struct {
 	Data    struct {
 		ServiceCode int               `json:"service_code"`
 		Status      int               `json:"status"`
-		RequestId   string            `json:"request_id"`
+		RequestId   string            `json:"correlation_id"`
 		Message     string            `json:"message"`
 		Hostname    string            `json:"hostname"`
 		Error       string            `json:"error"`

@@ -1,11 +1,13 @@
 package response
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"github.com/exgamer/gosdk-core/pkg/context"
 	exception2 "github.com/exgamer/gosdk-core/pkg/exception"
 	"net/http"
+	"strings"
 
 	"github.com/exgamer/gosdk-core/pkg/debug"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
@@ -230,7 +232,7 @@ func Formatted(c *gin.Context) {
 	writeJSON(c, status, wrapWithDebug(c, true, data))
 }
 
-// writeError Тело ошибки SDK (status, error, message, request_id, hostname, details) со статусом исключения.
+// writeError Тело ошибки SDK (status, error, message, correlation_id, hostname, details) со статусом исключения.
 func writeError(c *gin.Context, httpEx *exception.HttpException) {
 	serviceName := "UNKNOWN (maybe you not used RequestMiddleware)"
 	requestId := "UNKNOWN (maybe you not used RequestMiddleware)"
@@ -240,16 +242,18 @@ func writeError(c *gin.Context, httpEx *exception.HttpException) {
 	}
 
 	if httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context()); httpInfo != nil {
-		requestId = httpInfo.RequestId
+		requestId = httpInfo.CorrelationId
 	}
 
+	message, details := publicErrorText(c, httpEx)
+
 	responseData := gin.H{
-		"status":     httpEx.Code,
-		"error":      httpEx.GetErrorType(),
-		"message":    httpEx.Error(),
-		"request_id": requestId,
-		"hostname":   serviceName,
-		"details":    httpEx.Context,
+		"status":         httpEx.Code,
+		"error":          httpEx.GetErrorType(),
+		"message":        message,
+		"correlation_id": requestId,
+		"hostname":       serviceName,
+		"details":        details,
 	}
 
 	if isRaw(c) {
@@ -259,6 +263,22 @@ func writeError(c *gin.Context, httpEx *exception.HttpException) {
 	}
 
 	writeJSON(c, httpEx.Code, wrapWithDebug(c, false, responseData))
+}
+
+// publicErrorText Сообщение и details для клиента. Ошибка сервера (5xx) — только текст статуса («Internal Server
+// Error») без details: текст внутренней ошибки (адрес БД, пользователь, SQL) клиенту не уходит; полная ошибка — в лог
+// и Sentry, как раньше. С HTTP_ERROR_DETAILS (gin.ErrorDetailsEnabled) — текст ошибки и details, как раньше. 4xx — как раньше.
+func publicErrorText(c *gin.Context, httpEx *exception.HttpException) (string, map[string]any) {
+	if httpEx.Code < http.StatusInternalServerError || gin2.ErrorDetailsEnabled(c) {
+		return httpEx.Error(), httpEx.Context
+	}
+
+	text := http.StatusText(httpEx.Code)
+	if text == "" {
+		text = http.StatusText(http.StatusInternalServerError)
+	}
+
+	return text, nil
 }
 
 // ErrAbortedWithoutResponse Запрос прерван c.Abort() без ответа (response.* или ErrorResponse): FormattedResponseMiddleware отвечает 500.
@@ -296,7 +316,7 @@ func wrapWithDebug(c *gin.Context, success bool, data any) any {
 		}{
 			Success: success,
 			Data:    data,
-			Debug:   dbg,
+			Debug:   maskedDebug(dbg),
 		}
 	}
 
@@ -316,4 +336,49 @@ func writeJSON(c *gin.Context, status int, payload any) {
 		return
 	}
 	c.Data(status, "application/json", b)
+}
+
+// debugMask Замена секрета в debug-поле ответа.
+const debugMask = "***"
+
+// maskedDebug Debug-поле ответа без секретов: значения чувствительных ключей (gin.IsSensitiveKey) на любой глубине —
+// заголовки, параметры, ответы — и секреты внутри строковых полей body (JSON или форма исходящего запроса) — «***».
+// Коллектор не меняется. Ошибка сериализации — debug-поле пустое, а не сырые данные.
+func maskedDebug(dbg *debug.DebugCollector) any {
+	raw, err := json.Marshal(dbg)
+	if err != nil {
+		return nil
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+
+	var v any
+	if err := decoder.Decode(&v); err != nil {
+		return nil
+	}
+
+	return maskBodies(gin2.MaskJSONKeys(v, debugMask))
+}
+
+// maskBodies Строковые значения ключа body — через gin.MaskBodyString.
+func maskBodies(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		for key, value := range t {
+			if s, ok := value.(string); ok && strings.EqualFold(key, "body") {
+				t[key] = gin2.MaskBodyString(s, debugMask)
+
+				continue
+			}
+
+			t[key] = maskBodies(value)
+		}
+	case []any:
+		for i, value := range t {
+			t[i] = maskBodies(value)
+		}
+	}
+
+	return v
 }

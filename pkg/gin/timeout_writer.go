@@ -31,6 +31,10 @@ type timeoutWriter struct {
 	body   bytes.Buffer
 	ctxErr func() error // Err() контекста с таймаутом обработчика
 
+	// Поля тела ответа таймаута: тело строится только при таймауте, не на каждый запрос
+	correlationID string
+	serviceName   string
+
 	mu          sync.Mutex
 	status      int
 	size        int
@@ -105,16 +109,17 @@ func (w *timeoutWriter) writeTimeout(ctx context.Context) {
 	}
 
 	w.answered = true
+	response := timeoutResponse(w.correlationID, w.serviceName)
 
 	// Content-Length и Flush: клиент получает ответ целиком сразу, не дожидаясь конца обработчика.
 	// Connection: close: соединение занято обработчиком до его конца, следующий запрос клиента
 	// не должен ждать его в этом соединении.
 	w.origin.Header().Set("Content-Type", timeoutContentType)
-	w.origin.Header().Set("Content-Length", strconv.Itoa(len(timeoutBody)))
+	w.origin.Header().Set("Content-Length", strconv.Itoa(len(response)))
 	w.origin.Header().Set("Connection", "close")
 	w.origin.WriteHeader(timeoutStatus)
 
-	if _, err := w.origin.WriteString(timeoutBody); err != nil {
+	if _, err := w.origin.Write(response); err != nil {
 		logger.Warning(ctx, fmt.Sprintf("handler timeout: write timeout response: %v", err))
 
 		return

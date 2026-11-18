@@ -1,5 +1,71 @@
 # Changelog
 
+## v1.11.0
+
+Безопасное поведение по умолчанию: меняются ответ 5xx, разбор тела `ValidateRequestBody`, ответ таймаута, доверие
+`X-Forwarded-For` и метка метрик по умолчанию. Сигнатуры не изменились, новых переменных окружения нет; прежнее
+поведение метрик — `METRICS_URL_LABEL=path`, текст ошибки 5xx — `HTTP_ERROR_DETAILS=true` (только локально).
+
+### Изменено поведение
+- ⚠️ Клиенты, читающие `request_id` в теле ошибок, переходят на `correlation_id`; Swagger сервисов (`docs/docs.go`)
+  перегенерировать (`swag init`): структуры `structures.*` описывают `correlation_id`.
+- Id запроса стал сквозным id корреляции. Вход: `X-Correlation-Id` → `X-Request-Id` (ingress-nginx) → `Request-Id`
+  (прежний) → новый UUID; раньше — только `Request-Id`. Ответ — заголовок `X-Correlation-Id` (раньше заголовка id в
+  ответе не было), `Access-Control-Expose-Headers: X-Correlation-Id` (новый), `X-Correlation-Id` — в базовых
+  `Access-Control-Allow-Headers`. Поле тела ошибок (`response.*`, ответ `HANDLER_TIMEOUT`, структуры Swagger
+  `structures.*`) и данных события Sentry — `correlation_id` вместо `request_id`. Формат логов `[id,METHOD,path,status]`
+  не меняется — внутри тот же id. `HttpInfo.RequestId` и `constants.RequestIdHeaderName` — Deprecated, `RequestId`
+  заполняется тем же id.
+- Ответ 5xx через `response.ErrorResponse`/`InternalServerError`/`ErrorResponseWithStatus` (и raw-варианты) отдавал
+  клиенту текст внутренней ошибки (адрес и пользователь БД, SQL) и `details`. Теперь `message` — текст статуса
+  (`Internal Server Error`, `Service Unavailable`), `details` — `null`; полная ошибка — в лог и Sentry, как раньше.
+  С `HTTP_ERROR_DETAILS=true` — как раньше. 4xx не меняются.
+- `ValidateRequestBody`: без `Content-Type` тело разбиралось из query и формы (`binding.Default`), поля `json:"-"`
+  заполнялись по имени поля. Теперь без `Content-Type` и для `application/*+json` (`merge-patch+json`) — JSON (пустое
+  тело без `Content-Type` — пустой объект); форма (`x-www-form-urlencoded`, `multipart/form-data`) — только у запроса с
+  тегами `form`, иначе 415; прочие неизвестные типы — 415. `GET`, XML, YAML, TOML, protobuf, msgpack — как раньше.
+- Тело `ValidateRequestBody` (кроме формы) читалось без предела. Теперь больше 10 МиБ — 413 `request body too large`
+  (не 422). Загрузки файлов и роутер целиком предел не получают.
+- Поля `json:"-"` без тега `form` больше не заполняются из query и формы (`ValidateRequestBody`, `ValidateRequestQuery`).
+- Ответ `HANDLER_TIMEOUT` — 503 в формате ошибок SDK (`application/json`, `{"success":false,"data":{"status":503,
+  "error":"service_unavailable","message":"Service Unavailable","correlation_id":...,"hostname":...,"details":null}}`) вместо
+  `text/plain` `{"code": -1, "msg":"http: Handler timeout"}`.
+- `InitRouter` доверял `X-Forwarded-For`/`X-Real-IP` от любого адреса: клиент подделывал `ClientIP()`. Теперь доверенные
+  прокси — только частные сети, loopback и адреса подов в части CNI (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+  `127.0.0.0/8`, `100.64.0.0/10`, `::1`, `fc00::/7`); свой список — `router.SetTrustedProxies(...)` после `InitRouter`.
+- Метка `url` метрик `ginHelpers_*` по умолчанию — шаблон маршрута (`/items/:id`), а не путь: число серий не растёт с
+  id. Путь — `METRICS_URL_LABEL=path`; нераспознанное значение — шаблон и WARN при старте.
+- `helpers.GetPagerRequest`: `per_page` больше 100 обрезается до 100 (`helpers.MaxPaginationPerPage`).
+
+### Исправлено
+- Пользовательские правила валидации регистрировались в общем валидаторе по имени: одно имя у разных запросов с
+  разными функциями давало запросу чужое правило (зависело от порядка первых запросов, вложенные структуры — первого
+  разбора). Теперь под именем — диспетчер по типу валидируемого запроса: каждый запрос проверяется своей функцией;
+  запрос, который пользуется тегом, не объявив правило, получает функцию первого зарегистрировавшего, как раньше.
+- Чтение тела шло под блокировкой правил: медленный клиент задерживал регистрацию правил новых запросов. Теперь тело
+  читается до блокировки.
+- CORS: `Request-Id` (заголовок SDK) не был в `Access-Control-Allow-Headers`, `Vary: Origin` затирал выставленный
+  раньше `Vary`. Теперь `X-Correlation-Id` и `Request-Id` в базовом списке, `Vary` дополняется, ответ — с
+  `Access-Control-Expose-Headers: X-Correlation-Id`.
+- Debug-лог тела запроса писал секреты открытым текстом. Теперь ключи JSON на любой глубине и параметры формы
+  маскируются по правилам заголовков и query; multipart и JSON, который не разбирается (обрезан по 1 МиБ), — только
+  размер. Заголовок и ключ `Iin` маскируются (ИИН).
+- Debug-поле ответа (`DebugCollector`) отдавало клиенту тела, заголовки и ответы исходящих запросов с секретами.
+  Теперь чувствительные ключи и секреты в строковых `body` (JSON, форма) — `***`.
+
+### Добавлено
+- Ответы роутера `InitRouter` — с `X-Content-Type-Options: nosniff`.
+- WARN при старте `HttpKernel`, если `HANDLER_TIMEOUT` не меньше срока записи сервера (`SERVER_WRITE_TIMEOUT_SEC`).
+- `gin.ErrorDetailsEnabled(c)`, `gin.MaskJSONKeys`, `gin.MaskBodyString`, `helpers.MaxPaginationPerPage`.
+- Сквозной CorrelationID: `RequestInfoMiddleware` и `HANDLER_TIMEOUT` кладут id корреляции запроса в контекст
+  (`sdkctx.CorrelationID(c.Request.Context())`, gosdk-core) и в `HttpInfo.CorrelationId`; `gin.IncomingCorrelationID`,
+  `constants.CorrelationIdHeaderName` (`X-Correlation-Id`), `constants.XRequestIdHeaderName`. Требуется gosdk-core v1.3.0.
+
+### Сервис за `httputil.ReverseProxy` (gateway)
+- Ответ апстрима на http-core приходит со своим `X-Correlation-Id`, а `ReverseProxy` добавляет заголовки апстрима к уже
+  выставленным middleware прокси: клиент получает заголовок дважды. В `ModifyResponse` удалите заголовок апстрима
+  (`resp.Header.Del("X-Correlation-Id")`) или не ставьте свой в ответ прокси. См. README, «Id корреляции».
+
 ## v1.10.0
 
 Меняется ответ 422 на ошибку собственного `UnmarshalJSON` поля тела. Сигнатуры и переменные окружения не изменились.

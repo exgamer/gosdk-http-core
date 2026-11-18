@@ -124,15 +124,25 @@ func pathValues(params gin.Params) url.Values {
 	return out
 }
 
-// ValidateRequestBody - Валидация тела HTTP реквеста
+// ValidateRequestBody - Валидация тела HTTP реквеста. Разбор по Content-Type — bindBody: без Content-Type и
+// application/*+json — JSON, форма — только у запроса с тегами form (иначе 415), тело больше 10 МиБ — 413
 func ValidateRequestBody(c *gin.Context, request validation.IRequest) bool {
-	bodyBinding := binding.Default(c.Request.Method, c.ContentType())
-	if bodyBinding == binding.JSON {
-		bodyBinding = jsonOneValueBinding{}
-	}
-
-	err := bindWithCustomRules(c, request, bodyBinding)
+	err := bindBody(c, request)
 	if err != nil {
+		var tooLarge *http.MaxBytesError
+
+		if errors.As(err, &tooLarge) {
+			response.ErrorResponseUntrackableSentry(c, http.StatusRequestEntityTooLarge, errors.New("request body too large"), nil)
+
+			return false
+		}
+
+		if errors.Is(err, errUnsupportedMediaType) {
+			response.ErrorResponseUntrackableSentry(c, http.StatusUnsupportedMediaType, errUnsupportedMediaType, nil)
+
+			return false
+		}
+
 		var ve validator.ValidationErrors
 
 		if errors.As(err, &ve) {

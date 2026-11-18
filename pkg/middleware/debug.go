@@ -18,7 +18,7 @@ func DebugMiddleware() gin.HandlerFunc {
 		if httpInfo := gin2.GetHttpInfoFromContext(c.Request.Context()); httpInfo != nil {
 			collector.Meta["url"] = httpInfo.RequestUrl
 			collector.Meta["method"] = httpInfo.RequestMethod
-			collector.Meta["id"] = httpInfo.RequestId
+			collector.Meta["id"] = httpInfo.CorrelationId
 		}
 
 		// положили в request context

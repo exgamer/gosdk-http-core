@@ -154,7 +154,7 @@ func TestInitRouter_PanicLogAndEvent(t *testing.T) {
 		r.GET("/p", panicDetailsHandler)
 
 		req := httptest.NewRequest(http.MethodGet, "/p", nil)
-		req.Header.Set(constants.RequestIdHeaderName, "rid-1")
+		req.Header.Set(constants.CorrelationIdHeaderName, "rid-1")
 		serveRequest(r, req)
 
 		out := buf.String()
@@ -199,7 +199,7 @@ func TestInitRouter_PanicLogWithoutRequestData(t *testing.T) {
 	}
 }
 
-// Without RequestInfoMiddleware and reporter: method and path from the request, empty request_id, no panic.
+// Without RequestInfoMiddleware and reporter: method and path from the request, empty correlation_id, no panic.
 func TestErrorHandler_WithoutHttpInfo(t *testing.T) {
 	withPanicReporter(t)
 	buf := captureLog(t)

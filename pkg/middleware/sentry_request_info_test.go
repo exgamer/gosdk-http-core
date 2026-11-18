@@ -14,7 +14,7 @@ import (
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 )
 
-// SentryMiddleware finds HttpInfo and AppInfo under the new context keys: the event keeps request_id and hostname.
+// SentryMiddleware finds HttpInfo and AppInfo under the new context keys: the event keeps correlation_id and hostname.
 func TestSentryMiddleware_EventCarriesRequestIdAndServiceName(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	reporter := withReportReporter(t)
@@ -32,7 +32,7 @@ func TestSentryMiddleware_EventCarriesRequestIdAndServiceName(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
-	req.Header.Set(constants.RequestIdHeaderName, "rid-87")
+	req.Header.Set(constants.CorrelationIdHeaderName, "rid-87")
 	r.ServeHTTP(httptest.NewRecorder(), req)
 
 	events := reporter.all()
@@ -41,7 +41,7 @@ func TestSentryMiddleware_EventCarriesRequestIdAndServiceName(t *testing.T) {
 	}
 
 	data, _ := events[0].opts.Extra["error"].(map[string]any)
-	if data["request_id"] != "rid-87" || data["hostname"] != "svc" {
-		t.Errorf("event error data = %v, want request_id rid-87 and hostname svc", data)
+	if data["correlation_id"] != "rid-87" || data["hostname"] != "svc" {
+		t.Errorf("event error data = %v, want correlation_id rid-87 and hostname svc", data)
 	}
 }

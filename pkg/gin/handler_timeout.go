@@ -2,6 +2,7 @@ package gin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,17 +10,48 @@ import (
 	"sync"
 	"time"
 
+	sdkctx "github.com/exgamer/gosdk-core/pkg/context"
 	"github.com/exgamer/gosdk-core/pkg/logger"
-
 	"github.com/gin-gonic/gin"
+
+	"github.com/exgamer/gosdk-http-core/pkg/constants"
 )
 
-// Ответ таймаута — тот же, что отдавал github.com/vearne/gin-timeout v0.2.3.
+// Ответ таймаута — 503 в формате ошибок SDK (как response.ErrorResponse).
 const (
 	timeoutStatus      = http.StatusServiceUnavailable
-	timeoutBody        = `{"code": -1, "msg":"http: Handler timeout"}`
-	timeoutContentType = "text/plain; charset=utf-8"
+	timeoutContentType = "application/json"
+	unknownAnswerField = "UNKNOWN (maybe you not used RequestMiddleware)"
 )
+
+// timeoutResponse Тело ответа таймаута: {"success": false, "data": {status, error, message, correlation_id, hostname,
+// details}} — как у ошибки через response.ErrorResponse.
+func timeoutResponse(requestID, serviceName string) []byte {
+	if requestID == "" {
+		requestID = unknownAnswerField
+	}
+
+	if serviceName == "" {
+		serviceName = unknownAnswerField
+	}
+
+	body, err := json.Marshal(gin.H{
+		"success": false,
+		"data": gin.H{
+			"status":         timeoutStatus,
+			"error":          constants.GetErrorTypeByStatusCode(timeoutStatus),
+			"message":        http.StatusText(timeoutStatus),
+			"correlation_id": requestID,
+			"hostname":       serviceName,
+			"details":        nil,
+		},
+	})
+	if err != nil {
+		return []byte(`{"success":false,"data":{"status":503,"message":"Service Unavailable"}}`)
+	}
+
+	return body
+}
 
 // clientClosedStatus Статус запроса, оборванного клиентом до ответа, если обработчик ничего не написал
 // (код nginx 499 Client Closed Request, в net/http его нет): не ошибка сервера — в логе WARN, в метриках не 5xx.
@@ -32,7 +64,11 @@ const clientClosedStatus = 499
 // Потоковый ответ (после первого Flush) идёт клиенту напрямую: его таймаут только отменяет контекст.
 // Цепочка выполняется в горутине запроса: gin.Context не возвращается в пул, пока обработчик работает,
 // и не делится с другими запросами.
-func handlerTimeout(timeout time.Duration) gin.HandlerFunc {
+// serviceName — hostname в ответе таймаута. correlation_id ответа таймаута и заголовок ответа X-Correlation-Id — входящий
+// id (X-Correlation-Id → X-Request-Id → Request-Id) по формату; иначе сгенерированный здесь и записанный в заголовки
+// запроса (его же возьмёт RequestInfoMiddleware); он же — сквозной id корреляции в контексте обработчиков
+// (sdkctx.WithCorrelationID).
+func handlerTimeout(timeout time.Duration, serviceName string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if skipHandlerTimeout(c) {
 			c.Next()
@@ -40,11 +76,16 @@ func handlerTimeout(timeout time.Duration) gin.HandlerFunc {
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+		requestID := resolveCorrelationID(c)
+		c.Writer.Header().Set(constants.CorrelationIdHeaderName, requestID)
+
+		ctx, cancel := context.WithTimeout(sdkctx.WithCorrelationID(c.Request.Context(), requestID), timeout)
 		defer cancel()
 
 		request := c.Request
 		tw := newTimeoutWriter(ctx, c.Writer)
+		tw.correlationID = requestID
+		tw.serviceName = serviceName
 		stop := context.AfterFunc(ctx, func() { tw.timeout(ctx) })
 
 		defer func() {

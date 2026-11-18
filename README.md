@@ -92,7 +92,7 @@ http://0.0.0.0:8090/rest-template/doc.json
 {"message": "internal server error", "details": [], "success": false, "service_code": 0}
 ```
 
-В лог - одна запись `[ERROR]`: `[request_id,METHOD,path,status] panic: <текст>` и стек (переводы строк логгер
+В лог - одна запись `[ERROR]`: `[correlation_id,METHOD,path,status] panic: <текст>` и стек (переводы строк логгер
 `gosdk-core` пишет как `\n`, запись остаётся одной строкой). Путь - без query, заголовки и тело запроса не пишутся.
 Статус - тот, что получил клиент: 500, после `HANDLER_TIMEOUT` - 503. В Sentry - одно событие, как раньше.
 
@@ -110,6 +110,10 @@ http://0.0.0.0:8090/rest-template/doc.json
 При старте `InitRouter` пишет в лог `[INFO] error details disabled: HTTP_ERROR_DETAILS=""` или
 `error details enabled: HTTP_ERROR_DETAILS="true"` - включённую настройку видно в логе старта. Нераспознанное
 значение - дополнительно `[WARN] unrecognized HTTP_ERROR_DETAILS="yes", error details disabled; use true/1 or false/0`.
+
+Ошибка сервера через `response.ErrorResponse`/`response.InternalServerError` и любой статус 5xx (с v1.11.0): `message` —
+текст статуса (`"Internal Server Error"`, `"Service Unavailable"`), `details` — `null`; текст ошибки (адрес БД, пользователь,
+SQL) — только в лог и Sentry. С `HTTP_ERROR_DETAILS=true` — текст ошибки и `details`, как раньше. Ответы 4xx не меняются.
 
 Роутер без `InitRouter`, где паники ловит `ErrorHandler` пакета `pkg/gin`, - ответ всегда без деталей, настройка не
 читается. Подключать через `gin.CustomRecoveryWithWriter(nil, ginHelper.ErrorHandler)` (`ginHelper` - импорт
@@ -177,8 +181,10 @@ SENTRY_DSN=
 
 `SWAGGER_ENABLED` пустой - Swagger выключен; значения и прод - в разделе [SWAGGER](#swagger).
 `HTTP_ERROR_DETAILS` пустой - ответ 500 без деталей; на проде не задавать - раздел [HTTP_ERROR_DETAILS](#http_error_details).
-`HANDLER_TIMEOUT` - секунды на обработчик: по дедлайну клиент получает 503 `{"code": -1, "msg":"http: Handler timeout"}`
-(лог `[ERROR]`). Запрос, оборванный клиентом раньше, - не таймаут: статус обработчика, а если он ничего не написал -
+`HANDLER_TIMEOUT` - секунды на обработчик: по дедлайну клиент получает 503 в формате ошибок SDK (с v1.11.0;
+`application/json`, `{"success": false, "data": {"status": 503, "error": "service_unavailable", "message": "Service
+Unavailable", "correlation_id": ..., "hostname": ..., "details": null}}`, лог `[ERROR]`). `HANDLER_TIMEOUT` не меньше
+`SERVER_WRITE_TIMEOUT_SEC` — при старте WARN: сервер закрыл бы соединение раньше ответа 503. Запрос, оборванный клиентом раньше, - не таймаут: статус обработчика, а если он ничего не написал -
 499 (лог `[WARN]`, в метриках не 5xx).
 
 Таймауты HTTP-сервера, секунды. Не заданы (или `0`) — значения по умолчанию, `-1` — без таймаута:
@@ -211,14 +217,50 @@ gin2.WithoutHandlerTimeout(http.MethodGet, "/api/v1/events/:id")       // без
 | `SENSITIVE_KEYS_ALLOW` | ключи через запятую, которые не маскируются, даже если подходят под правила выше (например, `state`, если он не секрет) |
 | `VALIDATION_KEYS` | `json` — ключи ошибок 422 по тегу источника (тело — `json`, query — `form`, путь — `uri`, затем остальные) и полный путь вложенного поля (`items[2].component_ids`); не задана — последнее имя Go-поля в snake_case (`ComponentIDs` → `component_i_ds`). Ошибка типа JSON и (с v1.10.0) ошибка собственного `UnmarshalJSON` поля тела — ключ по пути JSON без индексов: `json` — `period.endDay`, не задана — `period_end_day` |
 | `METRICS_ENABLED` | `false`/`0` — без метрик `ginHelpers_*` и маршрута `/metrics` (если `/metrics` не должен быть на публичном адресе); не задана — включены |
-| `METRICS_URL_LABEL` | `route` — метка `url` метрик `ginHelpers_*` по шаблону маршрута (`/items/:id`), число серий не растёт с id; не задана — путь запроса |
+| `METRICS_URL_LABEL` | метка `url` метрик `ginHelpers_*`: не задана и `route` — шаблон маршрута (`/items/:id`, несматченный — `unmatched`), число серий не растёт с id (с v1.11.0 — по умолчанию); `path` — путь запроса, как до v1.11.0; другое значение — шаблон и WARN при старте |
 
 CORS (`middleware.CorsMiddleware`) — выключен, пока `CORS_ALLOWED_ORIGINS` пуст:
 
 | Переменная | Что задаёт |
 |---|---|
 | `CORS_ALLOWED_ORIGINS` | разрешённые origins через запятую — отражаются с `Access-Control-Allow-Credentials: true`; `*` — любой origin, с v1.9.0 без `Access-Control-Allow-Credentials` (cookie и credentials — только для явного списка). Origin `null` с credentials не разрешается |
-| `CORS_EXTRA_ALLOWED_HEADERS` | дополнительные заголовки для `Access-Control-Allow-Headers` через запятую, например `X-CSRF-Token`; добавляются к базовому списку `Origin, Content-Type, Accept, Authorization, X-Request-Id`, повторы и пустые элементы пропускаются; не задана — ответ прежний |
+| `CORS_EXTRA_ALLOWED_HEADERS` | дополнительные заголовки для `Access-Control-Allow-Headers` через запятую, например `X-CSRF-Token`; добавляются к базовому списку `Origin, Content-Type, Accept, Authorization, X-Correlation-Id, X-Request-Id, Request-Id`, повторы и пустые элементы пропускаются |
+
+Ответ CORS для разрешённого origin: `Vary: Origin` добавляется к уже выставленному `Vary` (не затирает его),
+`Access-Control-Expose-Headers: X-Correlation-Id` — скрипт фронта читает id корреляции из ответа (с v1.11.0).
+
+### Защита по умолчанию (v1.11.0)
+
+- `ClientIP()` берёт адрес из `X-Forwarded-For`/`X-Real-IP` только от частных сетей, loopback и адресов подов в части
+  CNI (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `100.64.0.0/10`, `::1`, `fc00::/7`) — ingress
+  и балансировщик внутри кластера.
+  Сервис за прокси с публичным адресом задаёт свой список после `InitRouter`: `router.SetTrustedProxies([]string{...})`.
+- Каждый ответ роутера — с `X-Content-Type-Options: nosniff`.
+- Debug-лог запроса маскирует ключи тела JSON на любой глубине и параметры формы по тем же правилам, что заголовки
+  и query (`SENSITIVE_KEYS`, `SENSITIVE_KEYS_ALLOW`); multipart и JSON, который не разбирается (обрезан по 1 МиБ),
+  — только размер. Заголовок и ключ `Iin` маскируются.
+- Debug-поле ответа (`DebugCollector`, уровень логов debug) маскирует секреты в заголовках, телах и ответах исходящих
+  запросов.
+- `helpers.GetPagerRequest`: `per_page` больше `MaxPaginationPerPage` (100) обрезается до 100.
+
+### Разбор тела `validators.ValidateRequestBody` (v1.11.0)
+
+| Запрос | Разбор |
+|---|---|
+| `GET` | параметры query (теги `form`), как раньше |
+| без `Content-Type`, `application/json`, `application/*+json` (`merge-patch+json`) | JSON; пустое тело без `Content-Type` — пустой объект (правила проверяются) |
+| `application/x-www-form-urlencoded`, `multipart/form-data` | форма — только если у запроса есть теги `form`; иначе 415 |
+| XML, YAML, TOML, protobuf, msgpack | как раньше |
+| прочие типы | 415 |
+
+- Тело (кроме формы) — не больше 10 МиБ, больше — 413 `request body too large`. Загрузки файлов (multipart) этим
+  пределом не ограничены; предел всего роутера SDK не ставит.
+- Поля с `json:"-"` без тега `form` из query и формы не заполняются (gin искал бы параметр по имени поля: `?UserID=1`) —
+  и в `ValidateRequestQuery`. Значение, выставленное сервисом до валидации, сохраняется.
+- Пользовательские правила (`CustomValidationRules`) с одним именем у разных запросов не конфликтуют: каждый запрос
+  проверяется своей функцией, в том числе во вложенных структурах и независимо от порядка первых запросов. Запрос,
+  который пользуется тегом правила, не объявив его, получает функцию первого зарегистрировавшего запроса, как раньше.
+- Тело читается до блокировки правил: медленный клиент не задерживает другие запросы.
 
 ---
 
@@ -249,9 +291,37 @@ router.GET("/health", func(c *gin.Context) {
 })
 ```
 
-`RequestInfoMiddleware` берёт входящий `Request-Id` (он уходит в логи, ответы и исходящие запросы), только если это
-1–128 символов `A-Z a-z 0-9 . _ : / + = -` (UUID, ULID, hex trace id, base64); пустой или другой — заменяется
-сгенерированным UUID, в том числе в заголовке запроса (с v1.8.0; раньше принимался любой).
+### Id корреляции (с v1.11.0)
+
+`RequestInfoMiddleware` (и `HANDLER_TIMEOUT`) берут входящий id корреляции из первого допустимого заголовка:
+`X-Correlation-Id` → `X-Request-Id` (ставит ingress-nginx) → `Request-Id` (прежний); допустимый — 1–128 символов
+`A-Z a-z 0-9 . _ : / + = -` (UUID, ULID, hex trace id, base64). Нет ни одного — новый UUID. Этот id:
+
+- в контексте запроса — `sdkctx.CorrelationID(c.Request.Context())` (`sdkctx` — `gosdk-core/pkg/context`) и
+  `HttpInfo.CorrelationId`;
+- в заголовке ответа `X-Correlation-Id` и в поле `correlation_id` тела ошибки;
+- в логах запроса `[id,METHOD,path,status]` (формат не меняется);
+- в исходящих запросах request-builder (`X-Correlation-Id`) и публикациях rabbit/kafka (`correlation_id`) из `ctx`.
+
+Прежние `HttpInfo.RequestId` и `constants.RequestIdHeaderName` остаются (Deprecated): `RequestId` — тот же id.
+
+> ⚠️ Клиенты, читающие `request_id` в теле ошибок, переходят на `correlation_id`; Swagger сервиса (`docs/docs.go`)
+> перегенерируйте (`swag init`).
+
+#### Сервис за `httputil.ReverseProxy` (gateway)
+
+Апстрим на http-core отвечает со своим `X-Correlation-Id`, а `ReverseProxy` добавляет заголовки ответа апстрима к уже
+выставленным middleware прокси — клиент получает заголовок дважды. В `ModifyResponse` удалите заголовок апстрима или
+не ставьте свой в ответ прокси:
+
+```go
+proxy.ModifyResponse = func(resp *http.Response) error {
+	resp.Header.Del(constants.CorrelationIdHeaderName) // остаётся id, выставленный middleware прокси
+	return nil
+}
+```
+
+Id тот же: запрос к апстриму уходит с `X-Correlation-Id`, выставленным middleware прокси.
 
 ---
 
@@ -284,7 +354,7 @@ response.InternalServerError(c, err, ctx)
 // ...и т.д., см. pkg/response/http_response_helper.go
 ```
 
-Ошибки оборачиваются аналогично — `{"success": false, "data": {"status", "error", "message", "request_id", "hostname", "details"}}`.
+Ошибки оборачиваются аналогично — `{"success": false, "data": {"status", "error", "message", "correlation_id", "hostname", "details"}}`.
 
 Ответ без тела (вебхук, back-channel logout, 204) — `response.NoContent(c, status)` (`0` — 204). Если хендлер сам
 записал тело (файл, текст, `c.JSON`), `Formatted` его не трогает и конверт не дописывает.

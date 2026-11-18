@@ -153,7 +153,7 @@ func TestWithAppInfo_ReachesTheRequestLogLine(t *testing.T) {
 	engine.GET("/x", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
-	req.Header.Set(constants.RequestIdHeaderName, "rid-95")
+	req.Header.Set(constants.CorrelationIdHeaderName, "rid-95")
 	engine.ServeHTTP(httptest.NewRecorder(), req)
 
 	if !strings.Contains(out.String(), "[INFO,svc]") || !strings.Contains(out.String(), "rid-95") {

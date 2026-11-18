@@ -1,9 +1,11 @@
 package gin
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -20,6 +22,8 @@ var sensitiveExact = map[string]struct{}{
 	"authorization": {}, "proxy-authorization": {}, "cookie": {}, "set-cookie": {}, "x-api-key": {}, "x-auth-token": {},
 	"password": {}, "token": {}, "access_token": {}, "refresh_token": {}, "id_token": {}, "client_secret": {},
 	"code": {}, "state": {},
+	// iin — ИИН (персональные данные): заголовок Iin и одноимённые поля
+	"iin": {},
 }
 
 // sensitiveParts Части ключа, по которым он чувствителен где угодно в имени.
@@ -105,4 +109,112 @@ func MaskQuery(q url.Values, mask string) url.Values {
 	}
 
 	return out
+}
+
+// MaskJSONKeys Копия разобранного JSON (map[string]any, []any, значения), в которой значения чувствительных ключей
+// (IsSensitiveKey) на любой глубине заменены на mask. Исходное значение не меняется.
+func MaskJSONKeys(v any, mask string) any {
+	switch t := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(t))
+
+		for key, value := range t {
+			if IsSensitiveKey(key) {
+				out[key] = mask
+
+				continue
+			}
+
+			out[key] = MaskJSONKeys(value, mask)
+		}
+
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, value := range t {
+			out[i] = MaskJSONKeys(value, mask)
+		}
+
+		return out
+	default:
+		return v
+	}
+}
+
+// MaskBodyString Тело запроса строкой с замаскированными секретами: JSON-объект или массив — значения чувствительных
+// ключей (MaskJSONKeys), тело формы (`a=1&password=x`) с чувствительным параметром — его значение; прочее — как есть.
+func MaskBodyString(body, mask string) string {
+	trimmed := strings.TrimSpace(body)
+	if trimmed == "" {
+		return body
+	}
+
+	if trimmed[0] == '{' || trimmed[0] == '[' {
+		decoder := json.NewDecoder(strings.NewReader(trimmed))
+		decoder.UseNumber()
+
+		var v any
+		if err := decoder.Decode(&v); err == nil {
+			if b, err := json.Marshal(MaskJSONKeys(v, mask)); err == nil {
+				return string(b)
+			}
+		}
+
+		return body
+	}
+
+	if values, err := url.ParseQuery(trimmed); err == nil && hasSensitiveKey(values) {
+		return encodeMaskedQuery(values, mask)
+	}
+
+	return body
+}
+
+// encodeMaskedQuery Параметры формы строкой (ключи по алфавиту, как url.Values.Encode); значение чувствительного
+// ключа — mask без экранирования.
+func encodeMaskedQuery(values url.Values, mask string) string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	var b strings.Builder
+
+	for _, key := range keys {
+		vs := values[key]
+		if IsSensitiveKey(key) {
+			vs = []string{""}
+		}
+
+		for _, v := range vs {
+			if b.Len() > 0 {
+				b.WriteByte('&')
+			}
+
+			b.WriteString(url.QueryEscape(key))
+			b.WriteByte('=')
+
+			if IsSensitiveKey(key) {
+				b.WriteString(mask)
+
+				continue
+			}
+
+			b.WriteString(url.QueryEscape(v))
+		}
+	}
+
+	return b.String()
+}
+
+func hasSensitiveKey(values url.Values) bool {
+	for key := range values {
+		if IsSensitiveKey(key) {
+			return true
+		}
+	}
+
+	return false
 }

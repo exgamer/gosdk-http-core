@@ -6,13 +6,17 @@ import (
 
 	"github.com/exgamer/gosdk-core/pkg/app"
 	"github.com/exgamer/gosdk-http-core/pkg/config"
+	"github.com/exgamer/gosdk-http-core/pkg/constants"
 	di2 "github.com/exgamer/gosdk-http-core/pkg/di"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/gin-gonic/gin"
 )
 
 // corsBaseAllowedHeaders Базовый список Access-Control-Allow-Headers.
-var corsBaseAllowedHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-Id"}
+// X-Correlation-Id — заголовок SDK (constants.CorrelationIdHeaderName): фронт передаёт свой id корреляции;
+// X-Request-Id и Request-Id — прежние, тоже принимаются на входе.
+var corsBaseAllowedHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", constants.CorrelationIdHeaderName,
+	constants.XRequestIdHeaderName, "Request-Id"}
 
 // CorsMiddleware разрешает cross-origin запросы.
 // Origins берутся из env CORS_ALLOWED_ORIGINS (список через запятую).
@@ -67,7 +71,9 @@ func corsHandler(httpConfig *config.HttpConfig) gin.HandlerFunc {
 		}
 
 		c.Header("Access-Control-Allow-Origin", httpInfo.RequestOrigin)
-		c.Header("Vary", "Origin")
+		addVary(c.Writer.Header(), "Origin")
+		// X-Correlation-Id ответа читается скриптом фронта (поиск запроса в логах по id).
+		c.Writer.Header().Add("Access-Control-Expose-Headers", constants.CorrelationIdHeaderName)
 
 		if credentials {
 			c.Header("Access-Control-Allow-Credentials", "true")
@@ -117,6 +123,20 @@ func corsAllowedHeaders(extra string) string {
 	}
 
 	return strings.Join(headers, ", ")
+}
+
+// addVary Добавляет value в Vary, не затирая значения, выставленные раньше (Accept-Encoding от gzip и т. п.);
+// повтор (без учёта регистра) не добавляется.
+func addVary(h http.Header, value string) {
+	for _, line := range h.Values("Vary") {
+		for _, v := range strings.Split(line, ",") {
+			if strings.EqualFold(strings.TrimSpace(v), value) {
+				return
+			}
+		}
+	}
+
+	h.Add("Vary", value)
 }
 
 func originAllowed(raw, origin string) bool {
