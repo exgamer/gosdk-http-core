@@ -2,6 +2,7 @@ package exception
 
 import (
 	"errors"
+	"github.com/exgamer/gosdk-http-core/internal/publictext"
 	"github.com/exgamer/gosdk-http-core/pkg/constants"
 	"github.com/gookit/validate"
 	"net/http"
@@ -13,6 +14,18 @@ type HttpException struct {
 	Context       map[string]any
 	Code          int
 	TrackInSentry bool
+
+	// explicitStatus Код задал сервис явно (NewHttpException, NewUntrackableHttpException, функции response со статусом):
+	// текст 5xx без вложенной причины уходит клиенту (response.publicErrorText).
+	explicitStatus bool
+}
+
+func init() {
+	publictext.Explicit = func(v any) bool {
+		e, ok := v.(*HttpException)
+
+		return ok && e != nil && e.explicitStatus
+	}
 }
 
 func (e *HttpException) Error() string {
@@ -29,17 +42,24 @@ func (e *HttpException) GetErrorType() string {
 	return constants.GetErrorTypeByStatusCode(e.Code)
 }
 
+// NewHttpException Исключение с кодом, заданным сервисом явно: при 5xx текст простой ошибки (без вложенной причины)
+// уходит клиенту, ошибка с причиной (%w, обёртка) — текст статуса.
 func NewHttpException(code int, err error, context map[string]any) *HttpException {
 	return &HttpException{
-		Err:           err,
-		Context:       context,
-		Code:          code,
-		TrackInSentry: true,
+		Err:            err,
+		Context:        context,
+		Code:           code,
+		TrackInSentry:  true,
+		explicitStatus: true,
 	}
 }
 
+// NewInternalServerErrorException 500 без явного кода: клиенту — текст статуса, ошибка — в лог и Sentry.
 func NewInternalServerErrorException(err error, context map[string]any) *HttpException {
-	return NewHttpException(http.StatusInternalServerError, err, context)
+	ex := NewHttpException(http.StatusInternalServerError, err, context)
+	ex.explicitStatus = false
+
+	return ex
 }
 
 func NewValidationHttpException(context map[string]any) *HttpException {

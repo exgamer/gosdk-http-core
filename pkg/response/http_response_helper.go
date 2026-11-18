@@ -7,9 +7,11 @@ import (
 	"github.com/exgamer/gosdk-core/pkg/context"
 	exception2 "github.com/exgamer/gosdk-core/pkg/exception"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/exgamer/gosdk-core/pkg/debug"
+	"github.com/exgamer/gosdk-http-core/internal/publictext"
 	"github.com/exgamer/gosdk-http-core/pkg/exception"
 	gin2 "github.com/exgamer/gosdk-http-core/pkg/gin"
 	"github.com/gin-gonic/gin"
@@ -51,12 +53,8 @@ func ErrorResponse(c *gin.Context, err error) {
 
 	var appEx *exception2.AppException
 	if errors.As(err, &appEx) {
-		code := mapKindToStatus(appEx.Kind)
-		httpErr := exception.NewHttpException(
-			code,
-			appEx.Err,
-			appEx.Context,
-		)
+		// Код выведен из вида ошибки, а не задан явно: текст 5xx клиенту не уходит.
+		httpErr := derivedHttpException(mapKindToStatus(appEx.Kind), appEx.Err, appEx.Context)
 		httpErr.TrackInSentry = appEx.TrackInSentry
 		c.Set(ctxKeyException, httpErr)
 		c.AbortWithStatus(httpErr.Code)
@@ -69,7 +67,15 @@ func ErrorResponse(c *gin.Context, err error) {
 	c.AbortWithStatus(httpErr.Code)
 }
 
+// ErrorResponseWithStatus Ошибка со статусом, заданным сервисом явно: при 5xx текст простой ошибки (без вложенной
+// причины) уходит клиенту, ошибка с причиной — текст статуса.
 func ErrorResponseWithStatus(c *gin.Context, statusCode int, err error, context map[string]any) {
+	errorResponseWithStatus(c, statusCode, err, context, true)
+}
+
+// errorResponseWithStatus explicit — статус задан сервисом явно (ErrorResponseWithStatus), а не именем функции
+// (InternalServerError): от него зависит, уйдёт ли клиенту текст 5xx.
+func errorResponseWithStatus(c *gin.Context, statusCode int, err error, context map[string]any, explicit bool) {
 	// 1. Если это уже HttpException → используем как есть
 	var httpEx *exception.HttpException
 	if errors.As(err, &httpEx) {
@@ -81,7 +87,7 @@ func ErrorResponseWithStatus(c *gin.Context, statusCode int, err error, context 
 	// 2. Если это AppException → превращаем в HttpException, сохранив поля
 	var appEx *exception2.AppException
 	if errors.As(err, &appEx) {
-		httpErr := exception.NewHttpException(statusCode, appEx.Err, appEx.Context)
+		httpErr := newHttpException(statusCode, appEx.Err, appEx.Context, explicit)
 		httpErr.TrackInSentry = appEx.TrackInSentry
 		ErrorResponse(c, httpErr)
 
@@ -89,7 +95,22 @@ func ErrorResponseWithStatus(c *gin.Context, statusCode int, err error, context 
 	}
 
 	// 3. Обычная ошибка → оборачиваем стандартно
-	ErrorResponse(c, exception.NewHttpException(statusCode, err, context))
+	ErrorResponse(c, newHttpException(statusCode, err, context, explicit))
+}
+
+// newHttpException Исключение с явным кодом (NewHttpException) или с кодом, выведенным SDK.
+func newHttpException(code int, err error, context map[string]any, explicit bool) *exception.HttpException {
+	if explicit {
+		return exception.NewHttpException(code, err, context)
+	}
+
+	return derivedHttpException(code, err, context)
+}
+
+// derivedHttpException Исключение с кодом, выведенным SDK (из вида ошибки или имени функции): признак явного кода
+// не ставится — текст 5xx клиенту не уходит.
+func derivedHttpException(code int, err error, context map[string]any) *exception.HttpException {
+	return &exception.HttpException{Err: err, Context: context, Code: code, TrackInSentry: true}
 }
 
 // ---------- базовые (error) ----------
@@ -122,8 +143,9 @@ func TooManyRequests(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatus(c, http.StatusTooManyRequests, err, ctx)
 }
 
+// InternalServerError 500: код задан именем функции, а не сервисом явно — клиенту текст статуса, ошибка — в лог и Sentry.
 func InternalServerError(c *gin.Context, err error, ctx map[string]any) {
-	ErrorResponseWithStatus(c, http.StatusInternalServerError, err, ctx)
+	errorResponseWithStatus(c, http.StatusInternalServerError, err, ctx, false)
 }
 
 func Success(c *gin.Context, data any) {
@@ -267,10 +289,17 @@ func writeError(c *gin.Context, httpEx *exception.HttpException) {
 
 // publicErrorText Сообщение и details для клиента. Ошибка сервера (5xx) — только текст статуса («Internal Server
 // Error») без details: текст внутренней ошибки (адрес БД, пользователь, SQL) клиенту не уходит; полная ошибка — в лог
-// и Sentry, как раньше. С HTTP_ERROR_DETAILS (gin.ErrorDetailsEnabled) — текст ошибки и details, как раньше. 4xx — как раньше.
+// и Sentry, как раньше. Исключение: код задан сервисом явно (ErrorResponseWithStatus, ErrorResponseUntrackableSentry,
+// их *Raw, NewHttpException, NewUntrackableHttpException) и ошибка — простое сообщение без вложенной причины
+// (не %w, не обёртка, не errors.Join): намеренный текст («Сервис временно недоступен») уходит как есть, details — null.
+// С HTTP_ERROR_DETAILS (gin.ErrorDetailsEnabled) — текст ошибки и details, как раньше. 4xx — как раньше.
 func publicErrorText(c *gin.Context, httpEx *exception.HttpException) (string, map[string]any) {
 	if httpEx.Code < http.StatusInternalServerError || gin2.ErrorDetailsEnabled(c) {
 		return httpEx.Error(), httpEx.Context
+	}
+
+	if publictext.Explicit(httpEx) && isPlainMessage(httpEx.Err) {
+		return httpEx.Err.Error(), nil
 	}
 
 	text := http.StatusText(httpEx.Code)
@@ -280,6 +309,15 @@ func publicErrorText(c *gin.Context, httpEx *exception.HttpException) (string, m
 
 	return text, nil
 }
+
+// isPlainMessage Ошибка — простое сообщение без вложенной причины: errors.Unwrap — nil и нет Unwrap() []error.
+func isPlainMessage(err error) bool {
+	return err != nil && reflect.TypeOf(err) == plainMessageType
+}
+
+// plainMessageType Тип простого сообщения (`errors.New`, `fmt.Errorf` без `%w`): ошибка драйвера или своего типа
+// (`*pgconn.PgError`) — не публичный текст, даже без вложенной причины
+var plainMessageType = reflect.TypeOf(errors.New(""))
 
 // ErrAbortedWithoutResponse Запрос прерван c.Abort() без ответа (response.* или ErrorResponse): FormattedResponseMiddleware отвечает 500.
 var ErrAbortedWithoutResponse = errors.New("request aborted without response")

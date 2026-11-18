@@ -115,6 +115,15 @@ http://0.0.0.0:8090/rest-template/doc.json
 текст статуса (`"Internal Server Error"`, `"Service Unavailable"`), `details` — `null`; текст ошибки (адрес БД, пользователь,
 SQL) — только в лог и Sentry. С `HTTP_ERROR_DETAILS=true` — текст ошибки и `details`, как раньше. Ответы 4xx не меняются.
 
+Намеренный текст 5xx (с v1.11.1) уходит клиенту как есть, если одновременно: код задан явно —
+`response.ErrorResponseWithStatus`, `response.ErrorResponseUntrackableSentry` (и их `*Raw`), `exception.NewHttpException`,
+`exception.NewUntrackableHttpException` — и ошибка — простое текстовое сообщение (`errors.New`, `fmt.Errorf` без `%w`;
+не обёртка, не `errors.Join`, не ошибка своего типа). Например, `response.ErrorResponseUntrackableSentry(c, http.StatusServiceUnavailable,
+errors.New("Сервис временно недоступен, повторите позже"), nil)` — клиент получит этот текст. `details` (context) в 5xx —
+`null` и здесь: только с `HTTP_ERROR_DETAILS=true`. Код, выведенный SDK (`ErrorResponse(c, err)`,
+`InternalServerError`, `NewInternalServerErrorException`, `AppException` по виду, паника), или любая другая ошибка
+(`fmt.Errorf("...: %w", err)`, ошибка драйвера `*pgconn.PgError`, свой тип) — текст статуса, как в v1.11.0.
+
 Роутер без `InitRouter`, где паники ловит `ErrorHandler` пакета `pkg/gin`, - ответ всегда без деталей, настройка не
 читается. Подключать через `gin.CustomRecoveryWithWriter(nil, ginHelper.ErrorHandler)` (`ginHelper` - импорт
 `pkg/gin` SDK, `gin` - `github.com/gin-gonic/gin`), а не `gin.CustomRecovery`: тот

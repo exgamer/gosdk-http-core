@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.11.1
+
+### Исправлено
+- Намеренный текст 5xx снова уходит клиенту: v1.11.0 заменял текст любого ответа 5xx на текст статуса, в том числе
+  заданный сервисом («Сервис временно недоступен, повторите позже»). Теперь текст как есть, если код задан явно
+  (`ErrorResponseWithStatus`, `ErrorResponseUntrackableSentry`, их `*Raw`, `exception.NewHttpException`,
+  `exception.NewUntrackableHttpException`) и ошибка — простое текстовое сообщение (`errors.New`, `fmt.Errorf` без `%w`; не обёртка,
+  не `errors.Join`, не ошибка своего типа вроде `*pgconn.PgError`). Код, выведенный SDK (`ErrorResponse(c, err)`, `InternalServerError`, `InternalServerErrorRaw`,
+  `NewInternalServerErrorException`, `AppException` по виду, паника), и ошибка с причиной — текст статуса, как в
+  v1.11.0. `details` в 5xx — только с `HTTP_ERROR_DETAILS=true`. Сигнатуры не изменились, новых настроек нет.
+
 ## v1.11.0
 
 Безопасное поведение по умолчанию: меняются ответ 5xx, разбор тела `ValidateRequestBody`, ответ таймаута, доверие

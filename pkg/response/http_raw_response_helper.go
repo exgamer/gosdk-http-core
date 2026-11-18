@@ -87,6 +87,8 @@ func TooManyRequestsRaw(c *gin.Context, err error, ctx map[string]any) {
 	ErrorResponseWithStatusRaw(c, http.StatusTooManyRequests, err, ctx)
 }
 
+// InternalServerErrorRaw 500 без обёртки: код задан именем функции — клиенту текст статуса, как у InternalServerError.
 func InternalServerErrorRaw(c *gin.Context, err error, ctx map[string]any) {
-	ErrorResponseWithStatusRaw(c, http.StatusInternalServerError, err, ctx)
+	c.Set(ctxKeyRaw, true)
+	errorResponseWithStatus(c, http.StatusInternalServerError, err, ctx, false)
 }
